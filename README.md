@@ -53,7 +53,8 @@ Cole o JSON no campo da esquerda. O texto pode vir sujo: cabecalho `EXPLAIN:`, s
 ## Estrutura
 
 ```
-index.html          layout da aplicacao
+index.html          layout da aplicacao e metatags
+404.html            pagina de erro (e o que desliga o modo SPA do Cloudflare Pages)
 css/style.css       estilos (tema claro/escuro)
 js/graphics.js      medicao de texto e contexto de desenho estilo cairo que emite SVG
 js/nodes.js         nos do diagrama: layout e desenho de cada tipo de figura
@@ -62,7 +63,12 @@ js/explain.js       parser do EXPLAIN do MySQL, layout geral e render no SVG
 js/explain-pg.js    parser do EXPLAIN do PostgreSQL (herda de explain.js)
 js/samples.js       exemplos dos dois bancos
 js/app.js           interface: entrada, deteccao de dialeto, zoom/pan, tooltips, export
+og-image.png        imagem de compartilhamento (1200x630), gerada
+apple-touch-icon.png  icone de toque (180x180), gerado
+robots.txt          libera a indexacao e aponta o sitemap
+sitemap.xml         a unica URL do site
 tools/e2e.mjs       teste end-to-end em Chrome headless
+tools/og-image.mjs  gerador das duas imagens acima
 ```
 
 ### Como funciona
@@ -116,6 +122,35 @@ de onde sai o custo e o texto de detalhe.
   passa a ter mais de dois filhos e e desenhado como barra, nao como losango.
 - Quando o JSON traz varios planos no array, so o primeiro e desenhado (com aviso).
 
+## Indexacao e compartilhamento
+
+O `index.html` traz `canonical`, `robots`, Open Graph, Twitter card, `theme-color` para
+os dois temas e um bloco JSON-LD (`WebApplication`). O endereco publico
+(`https://explain-render.matob.dev/`) aparece em URL absoluta nessas tags, no
+`robots.txt` e no `sitemap.xml` - trocar de dominio exige mexer nos tres arquivos.
+
+Os arquivos do projeto sao ASCII puro. Como os acentos importam no que e indexado e no
+que aparece na previa de um link, as metatags usam entidades HTML (`&ccedil;`) e o
+JSON-LD usa escapes JSON (`\u00e7`), que o navegador e os robos leem acentuados. O
+teste `acentos decodificados nas metatags` garante isso.
+
+A imagem de previa e o icone de toque sao gerados a partir do proprio renderer, entao o
+diagrama do cartao e o mesmo SVG que a aplicacao exporta:
+
+```
+node tools/og-image.mjs
+```
+
+### Por que existe um 404.html
+
+O site e publicado no Cloudflare Pages, que decide sozinho se o projeto e uma aplicacao
+de pagina unica: *"if your project does not include a top-level `404.html` file, Pages
+assumes that you are deploying a single-page application"*. Sem esse arquivo, qualquer
+caminho inexistente respondia **200 com a home**, e cada URL errada que alguem linkasse
+virava uma copia da home aos olhos do buscador. Com o `404.html` na raiz, caminho
+desconhecido passa a responder 404 de verdade. A pagina leva `noindex` e nao depende do
+`css/style.css`, para renderizar mesmo se o caminho do estilo mudar.
+
 ## Testes
 
 ```
@@ -124,7 +159,8 @@ node tools/e2e.mjs
 
 Sobe o Chrome headless, renderiza todos os exemplos dos dois bancos, confere as margens
 do recorte, testa tooltip, zoom, entradas invalidas, saida bruta do cliente mysql e do
-psql, e os downloads de SVG e PNG.
+psql, os downloads de SVG e PNG, e as metatags de indexacao e compartilhamento
+(incluindo o tamanho e o peso da imagem de previa).
 
 ## Licenca
 

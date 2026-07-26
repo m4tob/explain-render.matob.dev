@@ -7,7 +7,9 @@
  * Sai com codigo 1 se algum teste falhar.
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, readdirSync, statSync } from 'node:fs';
+import {
+  mkdtempSync, mkdirSync, rmSync, readdirSync, statSync, existsSync, readFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -264,6 +266,118 @@ check('download do SVG', !!svgFile && statSync(join(DOWNLOADS, svgFile)).size > 
   svgFile || files.join(','));
 check('download do PNG', !!pngFile && statSync(join(DOWNLOADS, pngFile)).size > 5000,
   pngFile || files.join(','));
+
+// tags de SEO e de compartilhamento
+const SITE = 'https://explain-render.matob.dev/';
+const meta = JSON.parse(await evaluate(`(function () {
+  function attr(sel, name) {
+    var e = document.querySelector(sel);
+    return e ? e.getAttribute(name) : null;
+  }
+  var ld = document.querySelector('script[type="application/ld+json"]');
+  return JSON.stringify({
+    title: document.title,
+    desc: attr('meta[name="description"]', 'content'),
+    canonical: attr('link[rel="canonical"]', 'href'),
+    robots: attr('meta[name="robots"]', 'content'),
+    ogTitle: attr('meta[property="og:title"]', 'content'),
+    ogDesc: attr('meta[property="og:description"]', 'content'),
+    ogUrl: attr('meta[property="og:url"]', 'content'),
+    ogImage: attr('meta[property="og:image"]', 'content'),
+    ogType: attr('meta[property="og:type"]', 'content'),
+    ogLocale: attr('meta[property="og:locale"]', 'content'),
+    twCard: attr('meta[name="twitter:card"]', 'content'),
+    twImage: attr('meta[name="twitter:image"]', 'content'),
+    touchIcon: attr('link[rel="apple-touch-icon"]', 'href'),
+    lang: document.documentElement.lang,
+    ld: ld ? ld.textContent : null
+  });
+})()`));
+
+check('title e description presentes',
+  meta.title.length > 20 && meta.title.length < 75 &&
+  meta.desc.length > 80 && meta.desc.length < 175,
+  `title ${meta.title.length} ch, description ${meta.desc.length} ch`);
+
+// as entidades HTML tem que chegar decodificadas em quem le a pagina
+check('acentos decodificados nas metatags',
+  /execu\u00e7\u00e3o/.test(meta.desc) && /n\u00famero/.test(meta.ogDesc) &&
+  !/&[a-z]+;/.test(meta.desc + meta.ogDesc + meta.title),
+  meta.desc.slice(0, 60) + '...');
+
+check('canonical e og:url apontam para o site',
+  meta.canonical === SITE && meta.ogUrl === SITE, meta.canonical);
+
+check('indexacao liberada',
+  /index/.test(meta.robots) && !/noindex/.test(meta.robots) &&
+  /max-image-preview:large/.test(meta.robots), meta.robots);
+
+check('Open Graph completo',
+  meta.ogType === 'website' && meta.ogLocale === 'pt_BR' &&
+  !!meta.ogTitle && !!meta.ogDesc && meta.ogImage === SITE + 'og-image.png',
+  `${meta.ogType}, ${meta.ogLocale}, ${meta.ogImage}`);
+
+check('Twitter card com imagem grande',
+  meta.twCard === 'summary_large_image' && meta.twImage === meta.ogImage, meta.twCard);
+
+check('idioma declarado', meta.lang === 'pt-BR', meta.lang);
+
+let ld = null;
+try { ld = JSON.parse(meta.ld); } catch { /* invalido */ }
+check('JSON-LD valido',
+  !!ld && ld['@type'] === 'WebApplication' && ld.url === SITE &&
+  Array.isArray(ld.featureList) && ld.featureList.length > 0,
+  ld ? `${ld['@type']}, ${ld.featureList.length} itens em featureList` : 'nao e JSON valido');
+
+// arquivos que as metatags e os robos referenciam
+function pngSize(file) {
+  const b = readFileSync(join(ROOT, file));
+  return [b.readUInt32BE(16), b.readUInt32BE(20)];
+}
+const og = existsSync(join(ROOT, 'og-image.png')) ? pngSize('og-image.png') : [0, 0];
+const ogBytes = og[0] ? statSync(join(ROOT, 'og-image.png')).size : 0;
+check('og-image.png com 1200x630 e leve o bastante',
+  og[0] === 1200 && og[1] === 630 && ogBytes < 300 * 1024,
+  `${og[0]}x${og[1]}, ${(ogBytes / 1024).toFixed(0)} KB`);
+
+const touch = existsSync(join(ROOT, 'apple-touch-icon.png')) ? pngSize('apple-touch-icon.png') : [0, 0];
+check('apple-touch-icon.png com 180x180',
+  touch[0] === 180 && touch[1] === 180 && meta.touchIcon === 'apple-touch-icon.png',
+  `${touch[0]}x${touch[1]}`);
+
+const robots = existsSync(join(ROOT, 'robots.txt')) ? readFileSync(join(ROOT, 'robots.txt'), 'utf8') : '';
+check('robots.txt libera o site e aponta o sitemap',
+  /^User-agent:\s*\*/m.test(robots) && !/^Disallow:\s*\/\s*$/m.test(robots) &&
+  robots.includes(SITE + 'sitemap.xml'), robots.trim().split('\n').join(' | '));
+
+const sitemap = existsSync(join(ROOT, 'sitemap.xml')) ? readFileSync(join(ROOT, 'sitemap.xml'), 'utf8') : '';
+check('sitemap.xml lista a URL canonica',
+  sitemap.includes(`<loc>${SITE}</loc>`) && /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.test(sitemap),
+  (/<lastmod>(.*?)<\/lastmod>/.exec(sitemap) || [, '?'])[1]);
+
+// a pagina de erro precisa existir na raiz: e a ausencia dela que faz o Cloudflare
+// Pages responder 200 com a home para qualquer caminho (modo SPA)
+await send('Page.navigate', { url: pathToFileURL(join(ROOT, '404.html')).href });
+await sleep(800);
+const page404 = JSON.parse(await evaluate(`(function () {
+  function attr(sel, name) {
+    var e = document.querySelector(sel);
+    return e ? e.getAttribute(name) : null;
+  }
+  return JSON.stringify({
+    title: document.title,
+    robots: attr('meta[name="robots"]', 'content'),
+    home: attr('a.btn', 'href'),
+    texto: (document.querySelector('h1') || {}).textContent || '',
+    altura: document.querySelector('.card') ? document.querySelector('.card').offsetHeight : 0,
+    estiloExterno: document.querySelectorAll('link[rel="stylesheet"]').length
+  });
+})()`));
+check('404.html fora do indice e com volta para a home',
+  /noindex/.test(page404.robots) && page404.home === '/' &&
+  page404.altura > 200 && page404.estiloExterno === 0 &&
+  /n\u00e3o existe/.test(page404.texto),
+  `${page404.robots}, ${page404.altura}px de altura`);
 
 console.log(results.join('\n'));
 const failed = results.filter((r) => r.startsWith('FAIL')).length;
