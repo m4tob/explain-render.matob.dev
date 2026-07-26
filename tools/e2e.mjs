@@ -1,0 +1,275 @@
+/*
+ * Teste end-to-end da aplicacao usando Chrome headless via DevTools Protocol.
+ * Nao precisa de dependencias: node >= 22 e o Google Chrome instalado.
+ *
+ *   node tools/e2e.mjs
+ *
+ * Sai com codigo 1 se algum teste falhar.
+ */
+import { spawn } from 'node:child_process';
+import { mkdtempSync, mkdirSync, rmSync, readdirSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const APP = pathToFileURL(join(ROOT, 'index.html')).href;
+const WORK = mkdtempSync(join(tmpdir(), 'explain-render-e2e-'));
+const DOWNLOADS = join(WORK, 'downloads');
+const PORT = 9333;
+
+mkdirSync(DOWNLOADS, { recursive: true });
+
+const chrome = spawn('google-chrome', [
+  '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
+  '--window-size=1400,900',
+  `--remote-debugging-port=${PORT}`,
+  `--user-data-dir=${join(WORK, 'profile')}`,
+  'about:blank'
+], { stdio: 'ignore' });
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function debuggerUrl() {
+  for (let i = 0; i < 50; i++) {
+    try {
+      const tabs = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+      const page = tabs.find((t) => t.type === 'page');
+      if (page) return page.webSocketDebuggerUrl;
+    } catch { /* chrome ainda subindo */ }
+    await sleep(200);
+  }
+  throw new Error('Chrome nao respondeu na porta de debug');
+}
+
+const ws = new WebSocket(await debuggerUrl());
+await new Promise((r) => ws.addEventListener('open', r));
+
+let nextId = 0;
+const pending = new Map();
+const events = [];
+
+ws.addEventListener('message', (m) => {
+  const msg = JSON.parse(m.data);
+  if (msg.id && pending.has(msg.id)) {
+    const { resolve: ok, reject } = pending.get(msg.id);
+    pending.delete(msg.id);
+    msg.error ? reject(new Error(JSON.stringify(msg.error))) : ok(msg.result);
+  } else if (msg.method) {
+    events.push(msg);
+  }
+});
+
+function send(method, params = {}) {
+  const id = ++nextId;
+  ws.send(JSON.stringify({ id, method, params }));
+  return new Promise((ok, reject) => pending.set(id, { resolve: ok, reject }));
+}
+
+async function evaluate(expression) {
+  const r = await send('Runtime.evaluate', {
+    expression, returnByValue: true, awaitPromise: true
+  });
+  if (r.exceptionDetails) throw new Error('JS: ' + r.exceptionDetails.text);
+  return r.result.value;
+}
+
+const results = [];
+const check = (name, ok, detail = '') =>
+  results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  ->  ' + detail : ''}`);
+
+await send('Runtime.enable');
+await send('Page.enable');
+await send('Log.enable');
+await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DOWNLOADS });
+
+await send('Page.navigate', { url: APP });
+await sleep(2500);
+
+// nenhum erro de console
+const consoleErrors = events.filter((e) =>
+  e.method === 'Runtime.exceptionThrown' ||
+  (e.method === 'Log.entryAdded' && e.params.entry.level === 'error'));
+check('sem erros de console', consoleErrors.length === 0,
+  consoleErrors.map((e) => JSON.stringify(e.params).slice(0, 200)).join(' | '));
+
+// diagrama inicial
+const initial = JSON.parse(await evaluate(`JSON.stringify({
+  content: document.querySelectorAll('#content path, #content text').length,
+  hits: document.querySelectorAll('#hits > *').length,
+  status: document.getElementById('status').textContent,
+  empty: document.getElementById('empty-state').hidden
+})`));
+check('diagrama inicial desenhado', initial.content > 20, 'elementos=' + initial.content);
+check('areas de hover criadas', initial.hits >= 2, 'hits=' + initial.hits);
+check('estado vazio escondido', initial.empty === true);
+
+// todos os exemplos
+const dialects = new Set();
+const total = await evaluate(`document.querySelectorAll('#samples .chip').length`);
+for (let i = 0; i < total; i++) {
+  await evaluate(`document.querySelectorAll('#samples .chip')[${i}].click()`);
+  await sleep(250);
+  const info = JSON.parse(await evaluate(`JSON.stringify({
+    n: document.querySelectorAll('#content path, #content text').length,
+    cls: document.getElementById('status').className,
+    txt: document.getElementById('status').textContent
+  })`));
+  check(`exemplo ${i} renderiza`, info.n > 10 && !/error/.test(info.cls), info.txt);
+  dialects.add(info.txt.split(' -')[0]);
+}
+
+// recorte: 15px nas laterais, 10px em cima e embaixo
+const pad = JSON.parse(await evaluate(`(function () {
+  var inner = document.querySelector('#content > g');
+  var bg = document.querySelector('#content > rect');
+  var min = [Infinity, Infinity], max = [-Infinity, -Infinity];
+  inner.querySelectorAll('path, text, rect').forEach(function (e) {
+    var b = e.getBBox();
+    if (!b.width && !b.height) return;
+    var m = 0, s = e.getAttribute('stroke');
+    if (s && s !== 'none') {
+      var sw = parseFloat(e.getAttribute('stroke-width'));
+      if (!isNaN(sw)) m = sw / 2;
+    }
+    min[0] = Math.min(min[0], b.x - m); min[1] = Math.min(min[1], b.y - m);
+    max[0] = Math.max(max[0], b.x + b.width + m); max[1] = Math.max(max[1], b.y + b.height + m);
+  });
+  var t = /translate\\(([-\\d.]+),([-\\d.]+)\\)/.exec(inner.getAttribute('transform'));
+  var dx = +t[1], dy = +t[2];
+  return JSON.stringify({
+    esq: +(min[0] + dx).toFixed(1),
+    topo: +(min[1] + dy).toFixed(1),
+    dir: +(+bg.getAttribute('width') - (max[0] + dx)).toFixed(1),
+    base: +(+bg.getAttribute('height') - (max[1] + dy)).toFixed(1)
+  });
+})()`));
+const near = (v, alvo) => Math.abs(v - alvo) <= 1.01;
+check('margens do recorte (15 x 10)',
+  near(pad.esq, 15) && near(pad.dir, 15) && near(pad.topo, 10) && near(pad.base, 10),
+  JSON.stringify(pad));
+
+check('exemplos cobrem os dois dialetos',
+  dialects.has('MySQL') && dialects.has('PostgreSQL'), [...dialects].join(', '));
+
+// tooltip
+const box = JSON.parse(await evaluate(`(function () {
+  var r = document.querySelectorAll('#hits > rect');
+  var b = r[r.length - 1].getBoundingClientRect();
+  return JSON.stringify({ x: b.left + b.width / 2, y: b.top + b.height / 2 });
+})()`));
+await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y, buttons: 0 });
+await sleep(400);
+const tip = JSON.parse(await evaluate(`JSON.stringify({
+  hidden: document.getElementById('tooltip').hidden,
+  heads: document.querySelectorAll('#tooltip .t-head').length
+})`));
+check('tooltip aparece no hover', tip.hidden === false && tip.heads > 0, JSON.stringify(tip));
+
+// zoom
+const zoomBefore = await evaluate(`document.getElementById('zoom-label').textContent`);
+await evaluate(`document.getElementById('btn-zoom-in').click()`);
+const zoomAfter = await evaluate(`document.getElementById('zoom-label').textContent`);
+check('zoom altera a escala', zoomBefore !== zoomAfter, `${zoomBefore} -> ${zoomAfter}`);
+await evaluate(`document.getElementById('btn-fit').click()`);
+
+// entradas invalidas
+await evaluate(`(function () {
+  document.getElementById('json-input').value = '{ isso nao e json';
+  document.getElementById('btn-render').click();
+})()`);
+await sleep(250);
+check('JSON invalido reportado',
+  /error/.test(await evaluate(`document.getElementById('status').className`)),
+  await evaluate(`document.getElementById('status').textContent`));
+
+await evaluate(`(function () {
+  document.getElementById('json-input').value = '{"algo": 1}';
+  document.getElementById('btn-render').click();
+})()`);
+await sleep(250);
+const noQueryBlock = await evaluate(`document.getElementById('status').textContent`);
+check('JSON sem query_block reportado', /query_block/.test(noQueryBlock), noQueryBlock);
+
+// saida colada direto do cliente mysql (com \G, cabecalho e rodape)
+const dirty = `*************************** 1. row ***************************
+EXPLAIN: {
+  "query_block": {
+    "select_id": 1,
+    "cost_info": { "query_cost": "1.00" },
+    "table": {
+      "table_name": "city",
+      "access_type": "ALL",
+      "rows_examined_per_scan": 1,
+      "filtered": "100.00"
+    }
+  }
+}
+1 row in set, 1 warning (0,00 sec)`;
+await evaluate(`(function () {
+  document.getElementById('json-input').value = ${JSON.stringify(dirty)};
+  document.getElementById('btn-render').click();
+})()`);
+await sleep(300);
+const pasted = JSON.parse(await evaluate(`JSON.stringify({
+  cls: document.getElementById('status').className,
+  txt: document.getElementById('status').textContent,
+  n: document.querySelectorAll('#content path, #content text').length
+})`));
+check('saida bruta do cliente mysql', !/error/.test(pasted.cls) && pasted.n > 5, pasted.txt);
+
+// saida bruta do psql no formato alinhado (com o "+" de continuacao de linha)
+const psql = `                        QUERY PLAN
+------------------------------------------------------------
+ [                                                          +
+   {                                                        +
+     "Plan": {                                              +
+       "Node Type": "Seq Scan",                             +
+       "Relation Name": "city",                             +
+       "Alias": "city",                                     +
+       "Startup Cost": 0.00,                                +
+       "Total Cost": 93.99,                                 +
+       "Plan Rows": 237,                                    +
+       "Plan Width": 49                                     +
+     }                                                      +
+   }                                                        +
+ ]
+(1 row)`;
+await evaluate(`(function () {
+  document.getElementById('json-input').value = ${JSON.stringify(psql)};
+  document.getElementById('btn-render').click();
+})()`);
+await sleep(300);
+const pgPasted = JSON.parse(await evaluate(`JSON.stringify({
+  cls: document.getElementById('status').className,
+  txt: document.getElementById('status').textContent,
+  n: document.querySelectorAll('#content path, #content text').length,
+  legenda: document.getElementById('legend-title').textContent
+})`));
+check('saida bruta do psql', !/error/.test(pgPasted.cls) && /PostgreSQL/.test(pgPasted.txt) &&
+  pgPasted.n > 5, pgPasted.txt);
+check('legenda acompanha o dialeto', /tipos de no/.test(pgPasted.legenda), pgPasted.legenda);
+
+// exportacoes
+await evaluate(`document.querySelectorAll('#samples .chip')[2].click()`);
+await sleep(400);
+await evaluate(`document.getElementById('btn-svg').click()`);
+await sleep(700);
+await evaluate(`document.getElementById('btn-png').click()`);
+await sleep(1800);
+const files = readdirSync(DOWNLOADS).filter((f) => !f.endsWith('.crdownload'));
+const svgFile = files.find((f) => f.endsWith('.svg'));
+const pngFile = files.find((f) => f.endsWith('.png'));
+check('download do SVG', !!svgFile && statSync(join(DOWNLOADS, svgFile)).size > 1000,
+  svgFile || files.join(','));
+check('download do PNG', !!pngFile && statSync(join(DOWNLOADS, pngFile)).size > 5000,
+  pngFile || files.join(','));
+
+console.log(results.join('\n'));
+const failed = results.filter((r) => r.startsWith('FAIL')).length;
+console.log(`\n${results.length - failed}/${results.length} testes passaram`);
+
+ws.close();
+chrome.kill();
+rmSync(WORK, { recursive: true, force: true });
+process.exit(failed ? 1 : 0);
