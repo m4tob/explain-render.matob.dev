@@ -11,8 +11,12 @@
 #   data: e blob: em img-src       -> o favicon e um SVG em data:, e o export
 #                                     PNG desenha um data: URL no canvas e
 #                                     baixa o resultado como blob:
+#   static.cloudflareinsights.com  -> o beacon do Web Analytics, que a
+#                                     Cloudflare injeta na borda. Nao esta em
+#                                     nenhum arquivo do repositorio, e sem esta
+#                                     liberacao a metrica do site para de chegar
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=31536000
   X-Frame-Options: DENY
   Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
