@@ -1,13 +1,11 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Os acentos vao como entidades HTML para o arquivo seguir em ASCII puro, como o
-     resto do projeto. O navegador e os robos leem "execucao" com cedilha e til. -->
-<title>EXPLAIN Render - visualizador de EXPLAIN do MySQL e do PostgreSQL</title>
-<meta name="description" content="Cole a sa&iacute;da do EXPLAIN em JSON do MySQL ou do PostgreSQL e veja o plano de execu&ccedil;&atilde;o virar diagrama. Exporta em SVG e PNG e roda 100% no navegador.">
+<title>EXPLAIN Render - visualize MySQL and PostgreSQL EXPLAIN plans</title>
+<meta name="description" content="Paste the EXPLAIN output in JSON from MySQL or PostgreSQL and read the query plan as a diagram. Exports SVG and PNG, runs entirely in the browser.">
 <link rel="canonical" href="https://explain-render.matob.dev/">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="color-scheme" content="light dark">
@@ -17,22 +15,22 @@
 <!-- Open Graph: WhatsApp, Telegram, LinkedIn, Slack, Discord, Facebook -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EXPLAIN Render">
-<meta property="og:locale" content="pt_BR">
+<meta property="og:locale" content="en_US">
 <meta property="og:url" content="https://explain-render.matob.dev/">
-<meta property="og:title" content="EXPLAIN Render - Plano de execu&ccedil;&atilde;o SQL em diagrama">
-<meta property="og:description" content="Cole o EXPLAIN em JSON do MySQL ou do PostgreSQL e veja o plano virar diagrama, com custo e n&uacute;mero de linhas em cada seta. Exporta SVG e PNG, 100% no navegador.">
+<meta property="og:title" content="EXPLAIN Render - SQL query plans as diagrams">
+<meta property="og:description" content="Paste a MySQL or PostgreSQL EXPLAIN in JSON and read the plan as a diagram, with cost and row count on every arrow. Exports SVG and PNG, all in the browser.">
 <meta property="og:image" content="https://explain-render.matob.dev/og-image.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Diagrama de um plano de execu&ccedil;&atilde;o do MySQL gerado pelo EXPLAIN Render: full table scan, nested loop e ORDER.">
+<meta property="og:image:alt" content="A MySQL query plan drawn by EXPLAIN Render: full table scan, nested loop and ORDER.">
 
 <!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="EXPLAIN Render - Plano de execu&ccedil;&atilde;o SQL em diagrama">
-<meta name="twitter:description" content="Cole o EXPLAIN em JSON do MySQL ou do PostgreSQL e veja o plano virar diagrama, com custo e n&uacute;mero de linhas em cada seta. Exporta SVG e PNG, 100% no navegador.">
+<meta name="twitter:title" content="EXPLAIN Render - SQL query plans as diagrams">
+<meta name="twitter:description" content="Paste a MySQL or PostgreSQL EXPLAIN in JSON and read the plan as a diagram, with cost and row count on every arrow. Exports SVG and PNG, all in the browser.">
 <meta name="twitter:image" content="https://explain-render.matob.dev/og-image.png">
-<meta name="twitter:image:alt" content="Diagrama de um plano de execu&ccedil;&atilde;o do MySQL gerado pelo EXPLAIN Render: full table scan, nested loop e ORDER.">
+<meta name="twitter:image:alt" content="A MySQL query plan drawn by EXPLAIN Render: full table scan, nested loop and ORDER.">
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6fb0'/%3E%3Crect x='6' y='5' width='20' height='7' rx='2' fill='%23fff'/%3E%3Crect x='4' y='20' width='10' height='7' rx='2' fill='%23fff' opacity='.85'/%3E%3Crect x='18' y='20' width='10' height='7' rx='2' fill='%23fff' opacity='.85'/%3E%3Cpath d='M16 12v4M9 16h14M9 16v4M23 16v4' stroke='%23fff' stroke-width='1.8' fill='none'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -45,26 +43,26 @@
   "@type": "WebApplication",
   "name": "EXPLAIN Render",
   "url": "https://explain-render.matob.dev/",
-  "description": "Visualizador de planos de execu\u00e7\u00e3o SQL em JSON: l\u00ea a sa\u00edda do EXPLAIN do MySQL e do PostgreSQL, desenha o diagrama e exporta em SVG e PNG. Roda inteiramente no navegador.",
+  "description": "Reads the EXPLAIN output of MySQL and PostgreSQL in JSON, draws the query plan as a diagram and exports it to SVG and PNG. Runs entirely in the browser.",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "Qualquer navegador moderno",
-  "browserRequirements": "Requer JavaScript",
-  "inLanguage": "pt-BR",
+  "operatingSystem": "Any modern browser",
+  "browserRequirements": "Requires JavaScript",
+  "inLanguage": "en",
   "isAccessibleForFree": true,
   "offers": {
     "@type": "Offer",
     "price": "0",
-    "priceCurrency": "BRL"
+    "priceCurrency": "USD"
   },
   "license": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.html",
   "screenshot": "https://explain-render.matob.dev/og-image.png",
   "featureList": [
-    "L\u00ea EXPLAIN FORMAT=JSON do MySQL",
-    "L\u00ea EXPLAIN (FORMAT JSON) do PostgreSQL",
-    "Detecta o dialeto automaticamente",
-    "Exporta o diagrama em SVG e em PNG",
-    "Com ANALYZE, compara o previsto com o real",
-    "Processa no navegador, sem enviar dados"
+    "Reads EXPLAIN FORMAT=JSON from MySQL",
+    "Reads EXPLAIN (FORMAT JSON) from PostgreSQL",
+    "Detects the dialect automatically",
+    "Exports the diagram to SVG and PNG",
+    "With ANALYZE, compares the estimate against what happened",
+    "Runs in the browser, sends no data anywhere"
   ]
 }
 </script>
@@ -82,11 +80,11 @@
     </svg>
     <div class="brand-text">
       <h1>EXPLAIN Render</h1>
-      <p>Planos de execucao SQL em JSON viram diagrama, 100% no navegador</p>
+      <p>SQL query plans in JSON, drawn as diagrams, entirely in your browser</p>
     </div>
   </div>
   <div class="topbar-actions">
-    <button id="btn-theme" class="icon-btn" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema">
+    <button id="btn-theme" class="icon-btn" type="button" title="Toggle light/dark theme" aria-label="Toggle theme">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -99,69 +97,69 @@
   <aside class="panel" id="panel">
     <section class="panel-section">
       <div class="section-head">
-        <h2>JSON do plano</h2>
-        <button id="btn-format" class="link-btn" type="button">formatar</button>
+        <h2>Plan JSON</h2>
+        <button id="btn-format" class="link-btn" type="button">format</button>
       </div>
       <textarea id="json-input" spellcheck="false" autocomplete="off" autocapitalize="off"
-        placeholder='Cole aqui a saida de:
+        placeholder='Paste the output of:
 
 MySQL       EXPLAIN FORMAT=JSON SELECT ...;
 PostgreSQL  EXPLAIN (FORMAT JSON) SELECT ...;
 
-O dialeto e detectado automaticamente.'></textarea>
+The dialect is detected automatically.'></textarea>
       <div class="btn-row">
-        <button id="btn-render" class="btn primary" type="button">Gerar diagrama</button>
-        <button id="btn-clear" class="btn" type="button">Limpar</button>
+        <button id="btn-render" class="btn primary" type="button">Render diagram</button>
+        <button id="btn-clear" class="btn" type="button">Clear</button>
       </div>
       <p id="status" class="status" role="status"></p>
     </section>
 
     <section class="panel-section">
-      <div class="section-head"><h2>Exemplos</h2></div>
+      <div class="section-head"><h2>Samples</h2></div>
       <div id="samples" class="samples"></div>
     </section>
 
     <section class="panel-section">
-      <div class="section-head"><h2>Opcoes</h2></div>
-      <label class="check"><input type="checkbox" id="opt-cost" checked> Mostrar custo nas setas</label>
-      <label class="check"><input type="checkbox" id="opt-tooltip" checked> Detalhes ao passar o mouse</label>
-      <label class="check"><input type="checkbox" id="opt-auto" checked> Gerar automaticamente ao digitar</label>
+      <div class="section-head"><h2>Options</h2></div>
+      <label class="check"><input type="checkbox" id="opt-cost" checked> Show cost on the arrows</label>
+      <label class="check"><input type="checkbox" id="opt-tooltip" checked> Details on hover</label>
+      <label class="check"><input type="checkbox" id="opt-auto" checked> Render as you type</label>
     </section>
 
     <section class="panel-section">
-      <div class="section-head"><h2 id="legend-title">Legenda</h2></div>
+      <div class="section-head"><h2 id="legend-title">Legend</h2></div>
       <ul id="legend" class="legend"></ul>
     </section>
 
     <section class="panel-section help">
-      <div class="section-head"><h2>Como usar</h2></div>
+      <div class="section-head"><h2>How to use it</h2></div>
       <ol>
-        <li>Gere o plano em JSON:
-          <br><code>EXPLAIN FORMAT=JSON &lt;query&gt;;</code> no MySQL
-          <br><code>EXPLAIN (FORMAT JSON) &lt;query&gt;;</code> no PostgreSQL
+        <li>Get the plan as JSON:
+          <br><code>EXPLAIN FORMAT=JSON &lt;query&gt;;</code> on MySQL
+          <br><code>EXPLAIN (FORMAT JSON) &lt;query&gt;;</code> on PostgreSQL
         </li>
-        <li>Copie o resultado e cole no campo acima.</li>
-        <li>Exporte o diagrama em SVG (vetorial) ou PNG.</li>
+        <li>Copy the result and paste it in the box above.</li>
+        <li>Export the diagram as SVG (vector) or PNG.</li>
       </ol>
-      <p class="fineprint">No PostgreSQL, acrescentar <code>ANALYZE</code> traz os numeros reais de
-        execucao e o diagrama passa a comparar o previsto com o que aconteceu.</p>
-      <p class="fineprint">Nada e enviado para servidor algum: o processamento acontece no seu navegador.</p>
+      <p class="fineprint">On PostgreSQL, adding <code>ANALYZE</code> brings the real execution
+        numbers, and the diagram starts comparing the estimate against what happened.</p>
+      <p class="fineprint">Nothing is sent to any server: everything runs in your browser.</p>
     </section>
   </aside>
 
   <section class="viewer">
     <div class="toolbar">
       <div class="tool-group">
-        <button id="btn-zoom-out" class="btn icon" type="button" title="Reduzir">&minus;</button>
+        <button id="btn-zoom-out" class="btn icon" type="button" title="Zoom out">&minus;</button>
         <span id="zoom-label" class="zoom-label">100%</span>
-        <button id="btn-zoom-in" class="btn icon" type="button" title="Ampliar">+</button>
-        <button id="btn-fit" class="btn" type="button">Ajustar</button>
+        <button id="btn-zoom-in" class="btn icon" type="button" title="Zoom in">+</button>
+        <button id="btn-fit" class="btn" type="button">Fit</button>
         <button id="btn-reset" class="btn" type="button">100%</button>
       </div>
       <div class="tool-group">
-        <button id="btn-copy" class="btn" type="button">Copiar SVG</button>
-        <button id="btn-png" class="btn" type="button">Baixar PNG</button>
-        <button id="btn-svg" class="btn primary" type="button">Baixar SVG</button>
+        <button id="btn-copy" class="btn" type="button">Copy SVG</button>
+        <button id="btn-png" class="btn" type="button">Download PNG</button>
+        <button id="btn-svg" class="btn primary" type="button">Download SVG</button>
       </div>
     </div>
 
@@ -180,7 +178,7 @@ O dialeto e detectado automaticamente.'></textarea>
           <rect x="14" y="15" width="8" height="6" rx="2"/>
           <path d="M12 9v3M6 12h12M6 12v3M18 12v3"/>
         </svg>
-        <p>Cole o JSON de um EXPLAIN do MySQL ou do PostgreSQL, ou escolha um exemplo.</p>
+        <p>Paste the JSON of a MySQL or PostgreSQL EXPLAIN, or pick a sample.</p>
       </div>
     </div>
 

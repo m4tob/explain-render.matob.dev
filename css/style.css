@@ -1,4 +1,4 @@
-/* EXPLAIN Render - estilos da aplicacao */
+/* EXPLAIN Render - application styles */
 
 :root {
   color-scheme: light;
@@ -415,7 +415,7 @@ textarea#json-input:focus {
 }
 .toast.show { opacity: 1; }
 
-/* ---------------- responsivo ---------------- */
+/* ---------------- responsive ---------------- */
 
 @media (max-width: 940px) {
   body { overflow: auto; }

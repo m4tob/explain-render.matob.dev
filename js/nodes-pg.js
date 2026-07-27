@@ -1,13 +1,13 @@
 /*
- * nodes-pg.js - nos do plano do PostgreSQL.
+ * nodes-pg.js - PostgreSQL plan nodes.
  *
- * Reusa o layout e o desenho das figuras do dialeto MySQL (nodes.js), trocando
- * apenas a semantica: cores por Node Type, rotulos, custos e o texto de detalhe.
+ * Reuses the layout and the figure drawing of the MySQL dialect (nodes.js) and
+ * only swaps the semantics: colors per Node Type, labels, costs and hint text.
  *
- *   scans (Seq Scan, Index Scan, ...)      -> caixa colorida + relacao + indice
- *   joins (Nested Loop, Hash Join, ...)    -> losango
- *   operacoes (Sort, Aggregate, Hash, ...) -> caixa arredondada
- *   n-arios (Append, BitmapOr, ...)        -> barra com os filhos lado a lado
+ *   scans (Seq Scan, Index Scan, ...)      -> colored box + relation + index
+ *   joins (Nested Loop, Hash Join, ...)    -> diamond
+ *   operations (Sort, Aggregate, Hash, ...) -> rounded box
+ *   n-ary (Append, BitmapOr, ...)          -> bar with the children side by side
  */
 (function (global) {
   'use strict';
@@ -24,35 +24,35 @@
   var GRAY = [0.4, 0.4, 0.4, 1];
 
   /* ------------------------------------------------------------------ *
-   * Tipos de no
+   * Node types
    * ------------------------------------------------------------------ */
 
   var JOIN_TYPES = ['Nested Loop', 'Hash Join', 'Merge Join'];
 
-  // [Node Type, cor, dica de custo]
+  // [Node Type, color, cost hint]
   var SCAN_TYPES = [
     ['Seq Scan', RED,
-      'Alto - le a tabela inteira. Um indice ajuda se o filtro for seletivo.'],
+      'High - reads the whole table. An index helps if the filter is selective.'],
     ['Parallel Seq Scan', ORANGE,
-      'Alto, porem dividido entre workers paralelos.'],
+      'High, but split across parallel workers.'],
     ['Index Scan', GREEN,
-      'Baixo - encontra as linhas pelo indice e busca cada uma na heap.'],
+      'Low - finds the rows through the index and fetches each one from the heap.'],
     ['Index Only Scan', BLUE,
-      'Muito baixo - responde so com o indice, sem ler a heap (depende do visibility map).'],
+      'Very low - answers from the index alone, without reading the heap (depends on the visibility map).'],
     ['Bitmap Index Scan', GREEN,
-      'Baixo - monta um bitmap dos blocos que interessam, sem ler a heap ainda.'],
+      'Low - builds a bitmap of the interesting blocks, without touching the heap yet.'],
     ['Bitmap Heap Scan', ORANGE,
-      'Medio - le a heap em ordem de bloco a partir do bitmap. Comum quando o filtro pega muitas linhas.'],
-    ['Tid Scan', BLUE, 'Muito baixo - acesso direto por ctid.'],
-    ['CTE Scan', ORANGE, 'Le o resultado ja materializado de uma CTE.'],
-    ['WorkTable Scan', ORANGE, 'Le a work table de uma CTE recursiva.'],
-    ['Subquery Scan', ORANGE, 'Le o resultado de uma subquery.'],
-    ['Function Scan', YELLOW, 'Le o retorno de uma funcao.'],
-    ['Table Function Scan', YELLOW, 'Le o retorno de uma funcao de tabela.'],
-    ['Values Scan', BLUE, 'Le uma lista VALUES constante.'],
-    ['Named Tuplestore Scan', ORANGE, 'Le um tuplestore nomeado (tabela de transicao de trigger).'],
-    ['Sample Scan', ORANGE, 'Le uma amostra da tabela (TABLESAMPLE).'],
-    ['Foreign Scan', ORANGE, 'Le uma tabela externa via FDW. O custo depende do servidor remoto.']
+      'Medium - reads the heap in block order from the bitmap. Common when the filter matches many rows.'],
+    ['Tid Scan', BLUE, 'Very low - direct access by ctid.'],
+    ['CTE Scan', ORANGE, 'Reads the already materialized result of a CTE.'],
+    ['WorkTable Scan', ORANGE, 'Reads the work table of a recursive CTE.'],
+    ['Subquery Scan', ORANGE, 'Reads the result of a subquery.'],
+    ['Function Scan', YELLOW, 'Reads the output of a function.'],
+    ['Table Function Scan', YELLOW, 'Reads the output of a table function.'],
+    ['Values Scan', BLUE, 'Reads a constant VALUES list.'],
+    ['Named Tuplestore Scan', ORANGE, 'Reads a named tuplestore (a trigger transition table).'],
+    ['Sample Scan', ORANGE, 'Reads a sample of the table (TABLESAMPLE).'],
+    ['Foreign Scan', ORANGE, 'Reads a foreign table through an FDW. The cost depends on the remote server.']
   ];
 
   var OP_COLORS = {
@@ -82,27 +82,27 @@
   };
 
   var OP_HINTS = {
-    'Sort': 'Ordena o resultado. Em disco (external merge) custa bem mais que em memoria.',
-    'Incremental Sort': 'Ordena aproveitando parte da ordem que ja vinha pronta.',
-    'Aggregate': 'Calcula agregacoes.',
-    'HashAggregate': 'Agrupa em uma hash table. Se estourar work_mem, vaza para disco.',
-    'GroupAggregate': 'Agrupa aproveitando a entrada ja ordenada.',
-    'Hash': 'Monta a hash table do lado interno do Hash Join. Mais de um batch significa disco.',
-    'Materialize': 'Guarda o resultado do filho para poder reler sem recalcular.',
-    'Memoize': 'Cacheia resultados do lado interno por chave, evitando repetir a busca.',
-    'Unique': 'Remove duplicatas de uma entrada ordenada.',
-    'WindowAgg': 'Aplica funcoes de janela.',
-    'Limit': 'Interrompe a leitura depois de N linhas.',
-    'Gather': 'Junta o resultado dos workers paralelos.',
-    'Gather Merge': 'Junta o resultado dos workers preservando a ordenacao.',
-    'Append': 'Concatena os filhos (UNION ALL, particoes).',
-    'Merge Append': 'Concatena os filhos preservando a ordenacao.',
-    'BitmapAnd': 'Cruza bitmaps de varios indices (AND).',
-    'BitmapOr': 'Une bitmaps de varios indices (OR).',
-    'Recursive Union': 'Executa a parte recursiva de uma CTE WITH RECURSIVE.',
-    'Nested Loop': 'Para cada linha do lado externo, varre o lado interno. Bom quando o externo tem poucas linhas.',
-    'Hash Join': 'Monta uma hash do lado interno e sonda com o externo. Bom para volumes maiores.',
-    'Merge Join': 'Percorre os dois lados ja ordenados em paralelo.'
+    'Sort': 'Sorts the result. On disk (external merge) it costs far more than in memory.',
+    'Incremental Sort': 'Sorts by taking advantage of the ordering the input already had.',
+    'Aggregate': 'Computes aggregates.',
+    'HashAggregate': 'Groups into a hash table. If it exceeds work_mem, it spills to disk.',
+    'GroupAggregate': 'Groups by relying on the already sorted input.',
+    'Hash': 'Builds the hash table for the inner side of a Hash Join. More than one batch means disk.',
+    'Materialize': 'Keeps the child result so it can be re-read without recomputing.',
+    'Memoize': 'Caches inner side results per key, avoiding repeated lookups.',
+    'Unique': 'Removes duplicates from a sorted input.',
+    'WindowAgg': 'Applies window functions.',
+    'Limit': 'Stops reading after N rows.',
+    'Gather': 'Collects the results of the parallel workers.',
+    'Gather Merge': 'Collects the results of the workers while preserving the ordering.',
+    'Append': 'Concatenates the children (UNION ALL, partitions).',
+    'Merge Append': 'Concatenates the children while preserving the ordering.',
+    'BitmapAnd': 'Intersects bitmaps from several indexes (AND).',
+    'BitmapOr': 'Unions bitmaps from several indexes (OR).',
+    'Recursive Union': 'Runs the recursive part of a WITH RECURSIVE CTE.',
+    'Nested Loop': 'For each outer row, scans the inner side. Good when the outer side has few rows.',
+    'Hash Join': 'Builds a hash of the inner side and probes it with the outer side. Good for larger volumes.',
+    'Merge Join': 'Walks both already sorted sides in step.'
   };
 
   function isJoin(type) { return JOIN_TYPES.indexOf(type) >= 0; }
@@ -136,7 +136,7 @@
     return loops === null ? rows : rows * loops;
   }
 
-  /** Linhas que saem do no: o numero real quando houver ANALYZE, senao a estimativa. */
+  /** Rows leaving the node: the actual count with ANALYZE, the estimate otherwise. */
   function rowsOf(plan) {
     var real = actualRows(plan);
     return real === null ? num(plan['Plan Rows']) : real;
@@ -177,15 +177,15 @@
     ['Hash Key', 'Hash Key'],
     ['Sort Method', 'Sort Method'],
     ['Sort Space Used', 'Sort Space (kB)'],
-    ['Rows Removed by Filter', 'Linhas descartadas pelo filtro'],
-    ['Rows Removed by Index Recheck', 'Linhas descartadas no recheck'],
+    ['Rows Removed by Filter', 'Rows removed by filter'],
+    ['Rows Removed by Index Recheck', 'Rows removed by recheck'],
     ['Heap Fetches', 'Heap Fetches'],
     ['Hash Batches', 'Hash Batches'],
-    ['Peak Memory Usage', 'Pico de memoria (kB)'],
-    ['Workers Planned', 'Workers planejados'],
-    ['Workers Launched', 'Workers ativos'],
-    ['Shared Hit Blocks', 'Blocos em cache'],
-    ['Shared Read Blocks', 'Blocos lidos do disco']
+    ['Peak Memory Usage', 'Peak memory (kB)'],
+    ['Workers Planned', 'Workers planned'],
+    ['Workers Launched', 'Workers launched'],
+    ['Shared Hit Blocks', 'Blocks from cache'],
+    ['Shared Read Blocks', 'Blocks read from disk']
   ];
 
   function line(label, value) {
@@ -198,28 +198,28 @@
     var text = '*' + (plan['Node Type'] || 'Plan') + '\n';
 
     var rel = relationLabel(plan);
-    if (rel) text += line('Relacao', rel);
-    if (plan['Index Name']) text += line('Indice', plan['Index Name']);
+    if (rel) text += line('Relation', rel);
+    if (plan['Index Name']) text += line('Index', plan['Index Name']);
     if (plan['Join Type']) text += line('Join Type', plan['Join Type']);
     if (plan['Strategy']) text += line('Strategy', plan['Strategy']);
-    if (plan['Parallel Aware']) text += line('Parallel Aware', 'sim');
+    if (plan['Parallel Aware']) text += line('Parallel Aware', 'yes');
     if (plan['Subplan Name']) text += line('Subplan', plan['Subplan Name']);
 
     var hint = OP_HINTS[plan['Node Type']] || scanStyle(plan['Node Type'])[2];
     if (hint) text += '  ' + hint + '\n';
 
-    text += '\n*Estimativa do planner\n';
-    text += line('Custo inicial', fmtNum(num(plan['Startup Cost'])));
-    text += line('Custo total', fmtNum(num(plan['Total Cost'])));
-    text += line('Linhas', fmtNum(num(plan['Plan Rows'])));
-    text += line('Largura (bytes)', fmtNum(num(plan['Plan Width'])));
+    text += '\n*Planner estimate\n';
+    text += line('Startup cost', fmtNum(num(plan['Startup Cost'])));
+    text += line('Total cost', fmtNum(num(plan['Total Cost'])));
+    text += line('Rows', fmtNum(num(plan['Plan Rows'])));
+    text += line('Width (bytes)', fmtNum(num(plan['Plan Width'])));
 
     var real = actualRows(plan);
     if (real !== null) {
-      text += '\n*Execucao real\n';
-      text += line('Tempo ate a 1a linha (ms)', fmtNum(num(plan['Actual Startup Time'])));
-      text += line('Tempo total (ms)', fmtNum(num(plan['Actual Total Time'])));
-      text += line('Linhas', fmtNum(real) +
+      text += '\n*Actual execution\n';
+      text += line('Time to first row (ms)', fmtNum(num(plan['Actual Startup Time'])));
+      text += line('Total time (ms)', fmtNum(num(plan['Actual Total Time'])));
+      text += line('Rows', fmtNum(real) +
         (num(plan['Actual Loops']) > 1 ? ' (' + plan['Actual Rows'] + ' x ' +
           plan['Actual Loops'] + ' loops)' : ''));
 
@@ -227,13 +227,13 @@
       if (planned !== null && planned > 0) {
         var ratio = real / planned;
         var desc;
-        if (ratio >= 10) desc = fmtNum(ratio) + 'x mais linhas que o previsto';
-        else if (ratio <= 0.1) desc = fmtNum(1 / ratio) + 'x menos linhas que o previsto';
-        else desc = 'proxima do previsto (' + fmtNum(ratio) + 'x)';
-        text += line('Estimativa', desc);
+        if (ratio >= 10) desc = fmtNum(ratio) + 'x more rows than estimated';
+        else if (ratio <= 0.1) desc = fmtNum(1 / ratio) + 'x fewer rows than estimated';
+        else desc = 'close to the estimate (' + fmtNum(ratio) + 'x)';
+        text += line('Estimate', desc);
         if (ratio >= 10 || ratio <= 0.1) {
-          text += '    Estimativa muito errada costuma levar o planner a escolher\n' +
-            '    o plano errado. Vale rodar ANALYZE na tabela.\n';
+          text += '    A badly wrong estimate usually leads the planner to the wrong\n' +
+            '    plan. Worth running ANALYZE on the table.\n';
         }
       }
     }
@@ -242,7 +242,7 @@
     for (var i = 0; i < COND_FIELDS.length; i++) {
       conds += line(COND_FIELDS[i][1], plan[COND_FIELDS[i][0]]);
     }
-    if (conds) text += '\n*Condicoes\n' + conds;
+    if (conds) text += '\n*Conditions\n' + conds;
 
     var extra = '';
     for (var j = 0; j < EXTRA_FIELDS.length; j++) {
@@ -261,13 +261,13 @@
 
   function costOf(plan) { return num(plan['Total Cost']); }
 
-  /** Seta para o no pai, mais o custo e a contagem de linhas ao lado dela. */
+  /** Arrow to the parent node, with the cost and row count alongside it. */
   function renderArrowToParent(cr) {
     if (!this.parent) return;
     cr.save();
     cr.set_source_rgba(0, 0, 0, 1);
     if ((this.parent instanceof n.NestedLoopNode) && this.parent.child_aside === this) {
-      // entra pela lateral do losango: linha em L
+      // enters through the side of the diamond: an L shaped line
       cr.move_to(this.varrow_source[0], this.varrow_source[1]);
       cr.line_to(this.varrow_source[0], this.parent.harrow_target[1]);
       this.draw_harrow(cr, this.varrow_source[0], this.parent.harrow_target[0],
@@ -295,7 +295,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Scan: caixa colorida com relacao e indice (layout do TableNode)
+   * Scan: colored box with relation and index (TableNode layout)
    * ------------------------------------------------------------------ */
 
   function PgScanNode(context, plan, child) {
@@ -325,8 +325,8 @@
   PgScanNode.prototype.do_render_extras = renderArrowToParent;
 
   PgScanNode.prototype.do_relayout = function (ctx) {
-    // nomes de relacao no PostgreSQL costumam ser longos (particoes, alias):
-    // a caixa acompanha o rotulo mais largo em vez de deixar o texto transbordar
+    // relation names in PostgreSQL tend to be long (partitions, aliases): the box
+    // grows with the widest label instead of letting the text overflow
     var i, width = 90;
     for (i = 0; i < this._items.length; i++) {
       this._items[i].set_usize(null, this._items[i]._uheight);
@@ -343,7 +343,7 @@
     if (!child) return;
     child.do_relayout(ctx);
 
-    // alinha a caixa com o ponto de conexao do filho, sem sair do lado esquerdo
+    // aligns the box with the child's connection point, without leaving the left edge
     var innerW = this.inner_width;
     var figX = child.vconnect_pos_offset - innerW / 2;
     var childX = 0;
@@ -360,7 +360,7 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * Join: losango (layout do NestedLoopNode)
+   * Join: diamond (NestedLoopNode layout)
    * ------------------------------------------------------------------ */
 
   function PgJoinNode(context, plan, outer, inner) {
@@ -372,7 +372,7 @@
   mixinPgNode(PgJoinNode.prototype);
 
   /* ------------------------------------------------------------------ *
-   * Operacao: caixa arredondada (layout do OperationNode, sempre vertical)
+   * Operation: rounded box (OperationNode layout, always vertical)
    * ------------------------------------------------------------------ */
 
   function opAttrs(plan) {
@@ -392,7 +392,7 @@
 
   function opColor(plan) {
     var type = plan['Node Type'];
-    // ordenacao ou hash em disco custam bem mais: sobem de cor
+    // sorting or hashing on disk costs far more: bump the color up
     if ((type === 'Sort' || type === 'Incremental Sort') &&
       /disk/i.test(plan['Sort Method'] || '')) return RED;
     if (type === 'Hash' && num(plan['Hash Batches']) > 1) return ORANGE;
@@ -442,12 +442,12 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * N-ario: barra com os filhos lado a lado (layout do SubQueries)
+   * N-ary: bar with the children side by side (SubQueries layout)
    * ------------------------------------------------------------------ */
 
   function PgGroupNode(context, plan, children) {
-    // o SubQueries posiciona da direita para a esquerda; invertendo, os filhos
-    // aparecem na ordem do plano
+    // SubQueries places children right to left; reversing keeps them
+    // in plan order
     n.SubQueries.call(this, context, plan['Node Type'], children.slice().reverse());
     this.plan = plan;
     this.set_spacing(4);
@@ -478,9 +478,9 @@
   PgPlanNode.prototype.render_cost = function (cr, x, y) {
     var plan = this.info.Plan || {};
     var parts = [];
-    if (num(plan['Total Cost']) !== null) parts.push('Custo total: ' + fmtNum(plan['Total Cost']));
+    if (num(plan['Total Cost']) !== null) parts.push('Total cost: ' + fmtNum(plan['Total Cost']));
     if (num(this.info['Execution Time']) !== null) {
-      parts.push('Execucao: ' + fmtNum(this.info['Execution Time']) + ' ms');
+      parts.push('Execution: ' + fmtNum(this.info['Execution Time']) + ' ms');
     }
     if (!parts.length) return;
     cr.set_source_rgba(0, 0, 0, 1);
@@ -490,10 +490,10 @@
   };
 
   PgPlanNode.prototype.get_hint_text = function () {
-    var text = '*Plano da query\n';
+    var text = '*Query plan\n';
     var plan = this.info.Plan || {};
-    text += line('Custo total estimado', fmtNum(num(plan['Total Cost'])));
-    text += line('Linhas estimadas', fmtNum(num(plan['Plan Rows'])));
+    text += line('Estimated total cost', fmtNum(num(plan['Total Cost'])));
+    text += line('Estimated rows', fmtNum(num(plan['Plan Rows'])));
     if (num(this.info['Planning Time']) !== null) {
       text += line('Planning Time (ms)', fmtNum(this.info['Planning Time']));
     }
@@ -512,7 +512,7 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * Legenda
+   * Legend
    * ------------------------------------------------------------------ */
 
   function legend() {

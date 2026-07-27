@@ -1,20 +1,20 @@
-# Cabecalhos aplicados pelo Cloudflare Pages a todas as respostas deste site.
-# Referrer-Policy e X-Content-Type-Options ja vem da Cloudflare, entao nao sao
-# repetidos aqui para nao mandar o cabecalho duas vezes.
+# Headers applied by Cloudflare Pages to every response from this site.
+# Referrer-Policy and X-Content-Type-Options already come from Cloudflare, so they
+# are not repeated here to avoid sending each header twice.
 #
-# A aplicacao e toda local: nao carrega nada de terceiros. Por isso a CSP pode
-# ser fechada em 'self'. As excecoes existem e sao necessarias:
-#   'unsafe-inline' em script-src  -> o bloco JSON-LD e inline, e sem isso o
-#                                     Chrome o bloqueia e o Googlebot deixa de
-#                                     ler os dados estruturados
-#   'unsafe-inline' em style-src   -> a pagina 404 tem <style> inline
-#   data: e blob: em img-src       -> o favicon e um SVG em data:, e o export
-#                                     PNG desenha um data: URL no canvas e
-#                                     baixa o resultado como blob:
-#   static.cloudflareinsights.com  -> o beacon do Web Analytics, que a
-#                                     Cloudflare injeta na borda. Nao esta em
-#                                     nenhum arquivo do repositorio, e sem esta
-#                                     liberacao a metrica do site para de chegar
+# The app is entirely local: it loads nothing from third parties, so the policy can
+# stay on 'self'. The exceptions are all needed:
+#   'unsafe-inline' in script-src -> the JSON-LD block is inline, and without this
+#                                    Chrome blocks it and Googlebot stops reading
+#                                    the structured data
+#   'unsafe-inline' in style-src  -> the 404 page has an inline <style>
+#   data: and blob: in img-src    -> the favicon is an SVG in a data: URL, and the
+#                                    PNG export draws a data: URL on a canvas and
+#                                    downloads the result as a blob
+#   static.cloudflareinsights.com -> the Web Analytics beacon, injected by Cloudflare
+#                                    at the edge. It is in no file in this repository,
+#                                    and without allowing it the site analytics
+#                                    silently stop being collected
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=31536000

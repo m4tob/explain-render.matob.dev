@@ -1,172 +1,174 @@
 # EXPLAIN Render
 
-Transforma o plano de execucao de uma query, em JSON, em um diagrama - e exporta em
-**SVG** (vetorial) ou PNG. Roda inteiramente no navegador, em HTML, CSS e JavaScript
-puros: sem backend, sem build, sem dependencias.
+Turns a query execution plan, in JSON, into a diagram - and exports it as **SVG**
+(vector) or PNG. Runs entirely in the browser, in plain HTML, CSS and JavaScript: no
+backend, no build step, no dependencies.
 
-Entende dois dialetos, detectados automaticamente pela forma do JSON:
+It reads two dialects, detected automatically from the shape of the JSON:
 
-| Banco | Comando | Raiz do JSON |
+| Database | Command | JSON root |
 |---|---|---|
-| MySQL | `EXPLAIN FORMAT=JSON <query>;` | objeto com `query_block` |
-| PostgreSQL | `EXPLAIN (FORMAT JSON) <query>;` | array com `Plan` |
+| MySQL | `EXPLAIN FORMAT=JSON <query>;` | object with `query_block` |
+| PostgreSQL | `EXPLAIN (FORMAT JSON) <query>;` | array with `Plan` |
 
-O ponto de partida foi o `mysql-visual-explain-server` (Flask + cairo + um CLI em
-Python): o mesmo diagrama do Visual Explain do MySQL Workbench, reescrito para o
-navegador e depois estendido para o PostgreSQL.
+The starting point was `mysql-visual-explain-server` (Flask + cairo + a Python CLI):
+the same diagram MySQL Workbench's Visual Explain draws, rewritten for the browser and
+then extended to PostgreSQL.
 
-## O que ele faz
+## What it does
 
-- Desenha a arvore de execucao com cores por custo, espessura de seta proporcional ao
-  numero de linhas, e o custo e a contagem de linhas em cada aresta.
-- **MySQL**: tabelas, nested loops (incluindo block nested loop e batched key access),
-  `GROUP` / `ORDER` / `DISTINCT`, subqueries anexadas, subqueries no SELECT, tabelas
-  materializadas, joins materializados (`buffer_result`) e `UNION`.
+- Draws the execution tree with colors by cost, arrow thickness proportional to the row
+  count, and the cost and row count on every edge.
+- **MySQL**: tables, nested loops (including block nested loop and batched key access),
+  `GROUP` / `ORDER` / `DISTINCT`, attached subqueries, subqueries in the SELECT list,
+  materialized tables, materialized joins (`buffer_result`) and `UNION`.
 - **PostgreSQL**: scans (Seq, Index, Index Only, Bitmap, CTE, Function, Foreign, ...),
-  joins (Nested Loop, Hash Join, Merge Join), operacoes (Sort, Aggregate, Hash,
-  Materialize, Memoize, Gather, Limit, ...) e nos n-arios (Append, Merge Append,
+  joins (Nested Loop, Hash Join, Merge Join), operations (Sort, Aggregate, Hash,
+  Materialize, Memoize, Gather, Limit, ...) and n-ary nodes (Append, Merge Append,
   BitmapAnd, BitmapOr, Recursive Union).
-- Com `EXPLAIN (FORMAT JSON, ANALYZE)`, o detalhe de cada no compara o previsto com o
-  que aconteceu e avisa quando a estimativa erra por 10x ou mais - que e onde costuma
-  estar a causa de um plano ruim.
-- Detalhes do no (chave usada, condicoes, custos, tempos) ao passar o mouse.
-- Zoom com a roda do mouse, arrastar para mover, ajustar a tela, duplo clique para
-  reenquadrar.
-- Exporta SVG, exporta PNG em 2x e copia o SVG para a area de transferencia. A imagem
-  sai recortada no conteudo, com margem de 15px nas laterais e 10px em cima e embaixo.
-- Exemplos prontos dos dois bancos, tema claro/escuro e persistencia do ultimo JSON.
+- With `EXPLAIN (FORMAT JSON, ANALYZE)`, the detail of each node compares the estimate
+  against what happened and flags an estimate off by 10x or more - usually where the
+  cause of a bad plan is hiding.
+- Node details (key used, conditions, costs, timings) on hover.
+- Zoom with the mouse wheel, drag to pan, fit to screen, double click to reframe.
+- Exports SVG, exports PNG at 2x and copies the SVG to the clipboard. The image is
+  cropped to the content, with a 15px margin on the sides and 10px top and bottom.
+- Ready made samples for both databases, light/dark theme, and the last JSON is kept
+  between visits.
 
-Nada e enviado para servidor nenhum: todo o processamento acontece na maquina do usuario.
+Nothing is sent to any server: all the processing happens on the user's machine.
 
-## Como usar
+## How to use it
 
-Abra o `index.html` direto no navegador (funciona via `file://`) ou sirva a pasta:
+Open `index.html` straight in the browser (it works over `file://`) or serve the folder:
 
 ```
 python3 -m http.server 8000
 ```
 
-Cole o JSON no campo da esquerda. O texto pode vir sujo: cabecalho `EXPLAIN:`, saida de
-`\G` do cliente mysql, `QUERY PLAN` com os `+` de continuacao do psql, rodape do tipo
-`1 row in set`. O parser recorta o objeto JSON sozinho.
+Paste the JSON in the field on the left. The text can be messy: an `EXPLAIN:` header,
+`\G` output from the mysql client, `QUERY PLAN` with psql's `+` continuation markers, a
+`1 row in set` footer. The parser carves out the JSON object on its own.
 
-## Estrutura
+## Layout of the repository
 
 ```
-index.html          layout da aplicacao e metatags
-404.html            pagina de erro (e o que desliga o modo SPA do Cloudflare Pages)
-css/style.css       estilos (tema claro/escuro)
-js/graphics.js      medicao de texto e contexto de desenho estilo cairo que emite SVG
-js/nodes.js         nos do diagrama: layout e desenho de cada tipo de figura
-js/nodes-pg.js      nos do PostgreSQL, reusando o layout de nodes.js
-js/explain.js       parser do EXPLAIN do MySQL, layout geral e render no SVG
-js/explain-pg.js    parser do EXPLAIN do PostgreSQL (herda de explain.js)
-js/samples.js       exemplos dos dois bancos
-js/app.js           interface: entrada, deteccao de dialeto, zoom/pan, tooltips, export
-og-image.png        imagem de compartilhamento (1200x630), gerada
-apple-touch-icon.png  icone de toque (180x180), gerado
-robots.txt          libera a indexacao e aponta o sitemap
-sitemap.xml         a unica URL do site
-_headers            CSP, HSTS e afins, lidos pelo Cloudflare Pages
-tools/e2e.mjs       teste end-to-end em Chrome headless
-tools/og-image.mjs  gerador das duas imagens acima
+index.html          app markup and metatags
+404.html            error page (and what turns off Cloudflare Pages' SPA mode)
+css/style.css       styles (light/dark theme)
+js/graphics.js      text measurement and a cairo-like drawing context that emits SVG
+js/nodes.js         diagram nodes: layout and drawing of each kind of figure
+js/nodes-pg.js      PostgreSQL nodes, reusing the layout from nodes.js
+js/explain.js       MySQL EXPLAIN parser, overall layout and SVG rendering
+js/explain-pg.js    PostgreSQL EXPLAIN parser (inherits from explain.js)
+js/samples.js       samples for both databases
+js/app.js           UI: input, dialect detection, zoom/pan, tooltips, export
+og-image.png        share image (1200x630), generated
+apple-touch-icon.png  touch icon (180x180), generated
+robots.txt          allows indexing and points at the sitemap
+sitemap.xml         the single URL of the site
+_headers            CSP, HSTS and friends, read by Cloudflare Pages
+tools/e2e.mjs       end-to-end test in headless Chrome
+tools/og-image.mjs  generator for the two images above
 ```
 
-### Como funciona
+### How it works
 
-1. O parser do dialeto percorre o JSON e monta a arvore de nos. No MySQL a estrutura vem
-   de chaves nomeadas (`nested_loop`, `grouping_operation`, `table`, `union_result`); no
-   PostgreSQL vem de um array `Plans` recursivo, e a forma do no e escolhida pela
-   quantidade de entradas: 2 entradas com tipo de join viram losango, 2 ou mais entradas
-   viram uma barra com os filhos lado a lado, o resto vira caixa.
-2. Cada no calcula o proprio tamanho e posiciona os filhos (`do_relayout`). O texto e
-   medido com `canvas.measureText`, que devolve as mesmas metricas que o
-   `cairo_text_extents` usava (bearing, advance, ascent e descent).
-3. O desenho usa um contexto com a API do cairo (`move_to`, `line_to`, `fill`,
-   `show_text`, ...) que, em vez de rasterizar, emite elementos SVG. Por isso o que
-   aparece na tela e exatamente o que e exportado: o export e o mesmo SVG, sem
-   conversao intermediaria.
-4. Depois de desenhar, `inkBounds()` mede o bounding box do que foi realmente pintado
-   (somando metade da espessura de cada traco, ja que `getBBox()` ignora o stroke) e
-   recorta a imagem nesse retangulo. O layout reserva mais area do que o desenho ocupa,
-   entao sem esse passo sobrava espaco em branco no SVG exportado.
+1. The dialect parser walks the JSON and builds the node tree. On MySQL the structure
+   comes from named keys (`nested_loop`, `grouping_operation`, `table`, `union_result`);
+   on PostgreSQL it comes from a recursive `Plans` array, and the shape of the node is
+   picked from the number of inputs: 2 inputs with a join type become a diamond, 2 or
+   more inputs become a bar with the children side by side, anything else becomes a box.
+2. Each node computes its own size and places its children (`do_relayout`). Text is
+   measured with `canvas.measureText`, which returns the same metrics
+   `cairo_text_extents` used to (bearing, advance, ascent and descent).
+3. The drawing goes through a context with cairo's API (`move_to`, `line_to`, `fill`,
+   `show_text`, ...) that emits SVG elements instead of rasterizing. That is why what
+   you see on screen is exactly what gets exported: the export is the same SVG, with no
+   intermediate conversion.
+4. After drawing, `inkBounds()` measures the bounding box of what was actually painted
+   (adding half of each stroke width, since `getBBox()` ignores the stroke) and crops
+   the image to that rectangle. The layout reserves more area than the drawing uses, so
+   without this step the exported SVG carried empty space around it.
 
-O layout roda em duas passadas, como no original (uma no `layout()`, outra no
-`repaint`): figuras com `HFill`, como a barra do `UNION` ou a do `Append`, se esticam
-ate a largura total calculada na passada anterior.
+The layout runs in two passes, as in the original (one in `layout()`, one in
+`repaint`): figures with `HFill`, such as the `UNION` bar or the `Append` bar, stretch
+to the total width computed by the previous pass.
 
-Os dois dialetos compartilham toda a camada de baixo: medicao de texto, figuras,
-layout, recorte, exportacao e interface. O que muda e so a semantica - cores, rotulos,
-de onde sai o custo e o texto de detalhe.
+Both dialects share the whole lower layer: text measurement, figures, layout, cropping,
+export and UI. What changes is only the semantics - colors, labels, where the cost comes
+from and the detail text.
 
-## Diferencas em relacao ao projeto original
+## Differences from the original project
 
-- Sem backend: o CLI em Python, o Flask e o cairo sairam.
-- O SVG e gerado diretamente pelo renderer (o original gerava PNG no servidor).
-- Suporte a PostgreSQL, que o original nao tinha.
-- Interatividade que o servidor nao tinha: zoom, pan, tooltips e tema.
-- Ajustes de layout em cima do original:
-  - quando o rotulo do tipo de acesso e mais largo que a caixa de uma tabela
-    materializada, a caixa cresce em vez de deixar o texto vazar, e a moldura
-    tracejada fica simetrica em torno do conteudo;
-  - o rotulo de atributos dos nos de operacao (`filesort`, `tmp table`, `quicksort`)
-    fica centralizado sob a figura, e nao alinhado a esquerda. A seta que chega no no
-    para logo abaixo desse rotulo, entao antes ela parecia apontar para o vazio ao
-    lado do texto em vez de apontar para o `ORDER` / `GROUP`;
-  - o custo e a contagem de linhas de uma seta ficam na mesma linha de base. Para
-    caberem lado a lado mesmo em figuras estreitas (o losango do nested loop), o
-    custo e recuado para a esquerda quando encostaria na contagem.
+- No backend: the Python CLI, Flask and cairo are gone.
+- The SVG is produced by the renderer directly (the original generated PNG on the server).
+- PostgreSQL support, which the original did not have.
+- Interactivity the server version did not have: zoom, pan, tooltips and theming.
+- Layout fixes on top of the original:
+  - when the access type label is wider than the box of a materialized table, the box
+    grows instead of letting the text spill out, and the dashed frame stays symmetric
+    around the content;
+  - the attribute label of operation nodes (`filesort`, `tmp table`, `quicksort`) is
+    centered under the figure rather than left aligned. The arrow reaching the node
+    stops right below that label, so before this it looked like it pointed at the empty
+    space beside the text instead of at the `ORDER` / `GROUP`;
+  - the cost and the row count of an arrow sit on the same baseline. So that both fit
+    side by side even on narrow figures (the nested loop diamond), the cost is pushed
+    left when it would touch the count.
 
-### Limites conhecidos no dialeto PostgreSQL
+### Known limits in the PostgreSQL dialect
 
-- Um no de join que traga subplans (`InitPlan` / `SubPlan`) junto das duas entradas
-  passa a ter mais de dois filhos e e desenhado como barra, nao como losango.
-- Quando o JSON traz varios planos no array, so o primeiro e desenhado (com aviso).
+- A join node that carries subplans (`InitPlan` / `SubPlan`) alongside its two inputs
+  ends up with more than two children and is drawn as a bar, not as a diamond.
+- When the JSON carries several plans in the array, only the first one is drawn (with a
+  warning).
 
-## Indexacao e compartilhamento
+## Indexing and sharing
 
-O `index.html` traz `canonical`, `robots`, Open Graph, Twitter card, `theme-color` para
-os dois temas e um bloco JSON-LD (`WebApplication`). O endereco publico
-(`https://explain-render.matob.dev/`) aparece em URL absoluta nessas tags, no
-`robots.txt` e no `sitemap.xml` - trocar de dominio exige mexer nos tres arquivos.
+`index.html` carries `canonical`, `robots`, Open Graph, a Twitter card, `theme-color`
+for both themes and a JSON-LD block (`WebApplication`). The public address
+(`https://explain-render.matob.dev/`) appears as an absolute URL in those tags, in
+`robots.txt` and in `sitemap.xml` - changing domain means touching all three files.
 
-Os arquivos do projeto sao ASCII puro. Como os acentos importam no que e indexado e no
-que aparece na previa de um link, as metatags usam entidades HTML (`&ccedil;`) e o
-JSON-LD usa escapes JSON (`\u00e7`), que o navegador e os robos leem acentuados. O
-teste `acentos decodificados nas metatags` garante isso.
-
-A imagem de previa e o icone de toque sao gerados a partir do proprio renderer, entao o
-diagrama do cartao e o mesmo SVG que a aplicacao exporta:
+The share image and the touch icon are generated from the renderer itself, so the
+diagram on the card is the same SVG the app exports:
 
 ```
 node tools/og-image.mjs
 ```
 
-### Por que existe um 404.html
+### Why there is a 404.html
 
-O site e publicado no Cloudflare Pages, que decide sozinho se o projeto e uma aplicacao
-de pagina unica: *"if your project does not include a top-level `404.html` file, Pages
-assumes that you are deploying a single-page application"*. Sem esse arquivo, qualquer
-caminho inexistente respondia **200 com a home**, e cada URL errada que alguem linkasse
-virava uma copia da home aos olhos do buscador. Com o `404.html` na raiz, caminho
-desconhecido passa a responder 404 de verdade. A pagina leva `noindex` e nao depende do
-`css/style.css`, para renderizar mesmo se o caminho do estilo mudar.
+The site is published on Cloudflare Pages, which decides on its own whether the project
+is a single-page application: *"if your project does not include a top-level `404.html`
+file, Pages assumes that you are deploying a single-page application"*. Without that
+file, any unknown path answered **200 with the home page**, and every wrong URL somebody
+linked looked like a copy of the home page to search engines. With `404.html` at the
+root, an unknown path answers a real 404. The page carries `noindex` and does not depend
+on `css/style.css`, so it renders even if the stylesheet path changes.
 
-## Testes
+## Tests
 
 ```
 node tools/e2e.mjs
 ```
 
-Sobe o Chrome headless, renderiza todos os exemplos dos dois bancos, confere as margens
-do recorte, testa tooltip, zoom, entradas invalidas, saida bruta do cliente mysql e do
-psql, os downloads de SVG e PNG, e as metatags de indexacao e compartilhamento
-(incluindo o tamanho e o peso da imagem de previa).
+Starts headless Chrome, renders every sample of both databases, checks the crop margins,
+exercises the tooltip, zoom, invalid input, raw output from the mysql client and from
+psql, the SVG and PNG downloads, and the indexing and sharing metatags (including the
+size and the weight of the share image).
 
-## Licenca
+## Language
 
-O algoritmo de layout e desenho e um porte do Visual Explain do MySQL Workbench
+Everything in this repository is in English: UI, code, comments, documentation and the
+metatags. It is a tool for developers reading query plans, and the vocabulary of the
+subject (`Seq Scan`, `nested loop`, `buffer_result`) is in English anyway.
+
+## License
+
+The layout and drawing algorithm is a port of MySQL Workbench's Visual Explain
 (`explain_renderer.py`, `canvas.py`), Copyright (c) 2012, 2021, Oracle and/or its
-affiliates, distribuido sob a GNU General Public License, version 2.0. Por ser um
-trabalho derivado, este projeto segue a mesma licenca (GPL-2.0). O texto completo
-esta em https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+affiliates, distributed under the GNU General Public License, version 2.0. Being a
+derivative work, this project follows the same license (GPL-2.0). The full text is at
+https://www.gnu.org/licenses/old-licenses/gpl-2.0.html

@@ -1,8 +1,8 @@
 /*
- * nodes.js - nos do diagrama do EXPLAIN (tabelas, nested loops, operacoes,
- * query blocks, subqueries, materializacoes) com layout e desenho.
+ * nodes.js - the EXPLAIN diagram nodes (tables, nested loops, operations, query
+ * blocks, subqueries, materializations), with their layout and drawing.
  *
- * Porte client-side do renderer do MySQL Workbench (Visual Explain).
+ * Client-side port of the MySQL Workbench renderer (Visual Explain).
  * Original: Copyright (c) 2012, 2021, Oracle and/or its affiliates - GPL v2.
  */
 (function (global) {
@@ -18,7 +18,7 @@
   var HFill = g.HFill;
 
   /* ------------------------------------------------------------------ *
-   * Formatacao
+   * Formatting
    * ------------------------------------------------------------------ */
 
   function fmtNum(n) {
@@ -49,7 +49,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Cores (0..1 como no cairo)
+   * Colors (0..1, as in cairo)
    * ------------------------------------------------------------------ */
 
   var BLUE = [0.25, 0.5, 0.75, 1];
@@ -178,9 +178,9 @@
   };
 
   /**
-   * `limit_x`: se informado, o texto e empurrado para a esquerda ate caber antes
-   * dessa coordenada. Serve para o custo nao encostar na contagem de linhas
-   * quando a figura e estreita (o losango do nested loop) ou o valor e longo.
+   * `limit_x`: when given, the text is pushed left until it fits before that
+   * coordinate. Keeps the cost from touching the row count when the figure is
+   * narrow (the nested loop diamond) or the value is long.
    */
   ExplainNode.prototype.render_cost = function (cr, x, y, limit_x) {
     var cost = this.cost_value;
@@ -306,8 +306,8 @@
     children: { get: function () { return [this.child_aside, this.child_below]; } },
     vconnect_pos_offset: {
       get: function () {
-        // o ponto de conexao do filho de baixo, e nao a metade da largura dele:
-        // ele pode ter recentralizado a propria figura sobre um filho mais largo
+        // the connection point of the child below, not half its width: that child
+        // may have recentered its own figure over a wider child of its own
         return this.child_aside.width + this._context.hspacing +
           this.child_below.vconnect_pos_offset;
       }
@@ -340,7 +340,7 @@
           this.draw_varrow(cr, this.varrow_source[0], this.varrow_source[1],
             this.parent.varrow_target[1]);
         }
-        // mesma linha de base do custo, como nas tabelas
+        // same baseline as the cost, as in the tables
         this.render_row_count(cr, this.varrow_source[0] + 4, this.varrow_source[1] - 5);
       }
       this.render_cost(cr, this._figure.root_x, this.varrow_source[1] - 5,
@@ -405,7 +405,7 @@
     for (var i = 0; i < COL_JOIN_TYPES.length; i++) {
       if (COL_JOIN_TYPES[i][0] === this.access_type) { entry = COL_JOIN_TYPES[i]; break; }
     }
-    // opts.color/label/hint permitem outro dialeto reusar a figura (ver nodes-pg.js)
+    // opts.color/label/hint let another dialect reuse this figure (see nodes-pg.js)
     var color = opts.color || entry[1];
     var label = opts.label || entry[2];
     var hint = opts.hint !== undefined ? opts.hint : entry[3];
@@ -543,7 +543,7 @@
       cr.save();
       cr.set_source_rgba(0, 0, 0, 1);
       if ((this.parent instanceof NestedLoopNode) && this.parent.child_aside === this) {
-        // caso especial: linha em L
+        // special case: L shaped line
         cr.move_to(this.varrow_source[0], this.varrow_source[1]);
         cr.line_to(this.varrow_source[0], this.parent.harrow_target[1]);
         this.draw_harrow(cr, this.varrow_source[0], this.parent.harrow_target[0],
@@ -574,7 +574,7 @@
 
     VBoxFigure.prototype.do_relayout.call(this, ctx);
 
-    // subselects no WHERE: ficam a direita da tabela
+    // subselects in the WHERE clause: they sit to the right of the table
     var child = this.child_attached_subqueries;
     if (child) {
       child.do_relayout(ctx);
@@ -639,8 +639,8 @@
 
     VBoxFigure.prototype.do_relayout.call(this, ctx);
 
-    // largura minima do container: o cabecalho (tipo de acesso, nome, chave)
-    // nao pode transbordar a caixa
+    // minimum container width: the header (access type, name, key) must not
+    // overflow the box
     for (var j = 0; j < this._items.length; j++) {
       width = Math.max(width, this._items[j].width);
     }
@@ -675,7 +675,7 @@
     TableNode.prototype.do_render.call(this, ctx);
     ctx.save();
     ctx.translate(this.x, this.y);
-    // moldura tracejada simetrica em torno do conteudo materializado
+    // dashed frame, symmetric around the materialized content
     ctx.rectangle(0.5, 0.5,
       Math.trunc(this.child_materialized_from.width + this.child_materialized_from.x * 2),
       Math.trunc(this.child_materialized_from.height + this.child_materialized_from.y +
@@ -701,8 +701,8 @@
    * ------------------------------------------------------------------ */
 
   /**
-   * `opts` (opcional) permite que outro dialeto reuse a figura com legenda, cor e
-   * rotulo proprios, no lugar do mapeamento das operacoes do MySQL. Ver nodes-pg.js.
+   * `opts` (optional) lets another dialect reuse this figure with its own caption,
+   * color and label instead of the MySQL operation mapping. See nodes-pg.js.
    */
   function OperationNode(context, operation, child, cost_info, attributes,
     optimized_away_subnode, opts) {
@@ -765,8 +765,8 @@
       this._figure_message = new TextFigure(attrs.join(','));
       this._figure_message.set_font_bold(true);
       this._figure_message.set_font_size(10);
-      // centralizado sob a figura, como o nome/chave das tabelas: a seta que
-      // chega no no aponta para o conjunto (figura + rotulo), nao para o lado dele
+      // centered under the figure, like the name/key of a table: the arrow coming
+      // into the node points at the whole block (figure + label), not beside it
       this._figure_message.set_layout_flags(0);
       this._figure_message.set_alignment(0.5, 0);
       this.add(this._figure_message);
@@ -936,7 +936,7 @@
     if (child) {
       child.do_relayout(ctx);
 
-      var voffset = 20; // espaco extra para o custo no topo
+      var voffset = 20; // extra room for the cost on top
       var child_align_x = child.vconnect_pos_offset;
 
       this._width = child.width;

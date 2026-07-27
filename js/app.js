@@ -1,5 +1,5 @@
 /*
- * app.js - interface: entrada do JSON, zoom/pan, tooltips e exportacao SVG/PNG.
+ * app.js - UI: JSON input, zoom/pan, tooltips and SVG/PNG export.
  */
 (function (global) {
   'use strict';
@@ -49,7 +49,7 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * Utilidades
+   * Helpers
    * ------------------------------------------------------------------ */
 
   function setStatus(msg, kind) {
@@ -93,12 +93,12 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Entrada: normaliza o que o usuario colou
+   * Input: normalize whatever was pasted
    * ------------------------------------------------------------------ */
 
   /**
-   * Recorta o primeiro objeto/array JSON completo do texto, ignorando o que
-   * vem antes (ex.: "EXPLAIN: ") e depois (ex.: "1 row in set (0,00 sec)").
+   * Extracts the first complete JSON object/array from the text, ignoring
+   * whatever comes before (e.g. "EXPLAIN: ") and after (e.g. "1 row in set").
    */
   function extractJson(text) {
     var start = -1, open = '', close = '';
@@ -132,14 +132,14 @@
     return text.slice(start);
   }
 
-  /** Limpeza da saida do psql no formato alinhado: pipes e o "+" de continuacao. */
+  /** Cleans up psql's aligned output: pipes and the "+" continuation marker. */
   function cleanPsql(text) {
     return text.split('\n').map(function (l) {
       return l.replace(/^\s*\|/, '').replace(/\s*\+\s*$/, '');
     }).join('\n');
   }
 
-  /** MySQL: objeto com query_block. PostgreSQL: array (ou objeto) com Plan. */
+  /** MySQL: object with query_block. PostgreSQL: array (or object) with Plan. */
   function detectDialect(data) {
     if (data && typeof data === 'object') {
       if (data.query_block) return 'mysql';
@@ -149,7 +149,7 @@
     return null;
   }
 
-  /** Alguns clientes devolvem o JSON dentro de uma coluna: { "EXPLAIN": "{...}" }. */
+  /** Some clients return the JSON inside a column: { "EXPLAIN": "{...}" }. */
   function unwrap(data) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
     var keys = Object.keys(data);
@@ -168,9 +168,9 @@
 
   function parseInput(text) {
     var trimmed = text.trim();
-    if (!trimmed) throw new Error('Cole o resultado do EXPLAIN em JSON.');
+    if (!trimmed) throw new Error('Paste the EXPLAIN output in JSON.');
 
-    // clientes de linha de comando trazem cabecalhos, pipes e rodape junto
+    // command line clients bring headers, pipes and footers along with the JSON
     var candidate = extractJson(trimmed);
 
     var data;
@@ -180,11 +180,11 @@
       try {
         data = JSON.parse(extractJson(cleanPsql(trimmed)));
       } catch (e2) {
-        throw new Error('JSON invalido: ' + e.message);
+        throw new Error('Invalid JSON: ' + e.message);
       }
     }
 
-    // JSON dentro de string (como no endpoint antigo em Flask)
+    // JSON nested inside a string (as in the old Flask endpoint)
     var guard = 0;
     while (typeof data === 'string' && guard++ < 3) data = JSON.parse(data);
 
@@ -198,14 +198,14 @@
     }
 
     if (!dialect) {
-      throw new Error('Nao reconheci o JSON: falta "query_block" (MySQL) ou "Plan" ' +
-        '(PostgreSQL). Use EXPLAIN FORMAT=JSON ou EXPLAIN (FORMAT JSON).');
+      throw new Error('Unrecognized JSON: missing "query_block" (MySQL) or "Plan" ' +
+        '(PostgreSQL). Use EXPLAIN FORMAT=JSON or EXPLAIN (FORMAT JSON).');
     }
     return { data: data, dialect: dialect };
   }
 
   /* ------------------------------------------------------------------ *
-   * Geracao do diagrama
+   * Diagram generation
    * ------------------------------------------------------------------ */
 
   function clearDiagram() {
@@ -243,10 +243,10 @@
       ctx = new Context(parsed.data, {
         displayed_cost_info: el.optCost.checked ? 'read_eval_cost' : null
       });
-      if (!ctx._root) throw new Error('Nao foi possivel interpretar o JSON do EXPLAIN.');
+      if (!ctx._root) throw new Error('Could not read the EXPLAIN JSON.');
       ctx.layout();
     } catch (e) {
-      setStatus('Erro ao montar o diagrama: ' + e.message, 'error');
+      setStatus('Error building the diagram: ' + e.message, 'error');
       return false;
     }
 
@@ -264,10 +264,10 @@
     el.empty.hidden = true;
     setExportEnabled(true);
 
-    var msg = DIALECTS[parsed.dialect].name + ' - ' + state.nodes.length + ' nos - ' +
+    var msg = DIALECTS[parsed.dialect].name + ' - ' + state.nodes.length + ' nodes - ' +
       ctx.size[0] + ' x ' + ctx.size[1] + ' px';
     if (ctx.warnings.length) {
-      msg += ' - ' + ctx.warnings.length + ' aviso(s): ' + ctx.warnings.slice(0, 3).join('; ');
+      msg += ' - ' + ctx.warnings.length + ' warning(s): ' + ctx.warnings.slice(0, 3).join('; ');
       setStatus(msg, '');
     } else {
       setStatus(msg, 'ok');
@@ -279,7 +279,7 @@
   }
 
   function buildHitAreas() {
-    // as areas seguem o mesmo deslocamento do recorte aplicado ao desenho
+    // the areas follow the same offset the crop applies to the drawing
     var offset = (state.ctx && state.ctx.offset) || [0, 0];
     el.hits.setAttribute('transform', 'translate(' + offset[0] + ',' + offset[1] + ')');
 
@@ -468,7 +468,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Exportacao
+   * Export
    * ------------------------------------------------------------------ */
 
   function buildStandaloneSvg() {
@@ -508,11 +508,11 @@
       c.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(function (blob) {
         if (blob) download(blob, 'explain-' + timestamp() + '.png');
-        else setStatus('Nao foi possivel gerar o PNG neste navegador.', 'error');
+        else setStatus('Could not generate the PNG in this browser.', 'error');
       }, 'image/png');
     };
     img.onerror = function () {
-      setStatus('Nao foi possivel converter o SVG para PNG.', 'error');
+      setStatus('Could not convert the SVG to PNG.', 'error');
     };
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
   }
@@ -522,7 +522,7 @@
     if (!text) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        toast('SVG copiado para a area de transferencia');
+        toast('SVG copied to the clipboard');
       }, function () { fallbackCopy(text); });
     } else {
       fallbackCopy(text);
@@ -538,22 +538,22 @@
     ta.select();
     try {
       document.execCommand('copy');
-      toast('SVG copiado para a area de transferencia');
+      toast('SVG copied to the clipboard');
     } catch (e) {
-      setStatus('Nao foi possivel copiar automaticamente.', 'error');
+      setStatus('Could not copy automatically.', 'error');
     }
     ta.remove();
   }
 
   /* ------------------------------------------------------------------ *
-   * Painel lateral
+   * Side panel
    * ------------------------------------------------------------------ */
 
   var DIALECTS = {
     mysql: {
       name: 'MySQL',
-      command: 'EXPLAIN FORMAT=JSON <sua query>;',
-      legendTitle: 'Legenda (custo de acesso)',
+      command: 'EXPLAIN FORMAT=JSON <your query>;',
+      legendTitle: 'Legend (access cost)',
       legend: function () {
         return global.VE.nodes.COL_JOIN_TYPES
           .filter(function (e) { return e[0] !== 'UNKNOWN'; })
@@ -562,15 +562,15 @@
     },
     postgres: {
       name: 'PostgreSQL',
-      command: 'EXPLAIN (FORMAT JSON, ANALYZE) <sua query>;',
-      legendTitle: 'Legenda (tipos de no)',
+      command: 'EXPLAIN (FORMAT JSON, ANALYZE) <your query>;',
+      legendTitle: 'Legend (node types)',
       legend: function () {
         return global.VE.pgNodes.legend().map(function (e) { return [e[0], e[1], '']; });
       }
     }
   };
 
-  /** Legenda e titulo acompanham o dialeto detectado. */
+  /** Legend and its title follow the detected dialect. */
   function setDialect(dialect) {
     if (state.dialect === dialect) return;
     state.dialect = dialect;
@@ -647,7 +647,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Tema
+   * Theme
    * ------------------------------------------------------------------ */
 
   function setupTheme() {
@@ -669,7 +669,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Inicializacao
+   * Startup
    * ------------------------------------------------------------------ */
 
   function setupEvents() {
@@ -705,7 +705,7 @@
       try {
         el.input.value = JSON.stringify(parseInput(el.input.value).data, null, 2);
         persist();
-        setStatus('JSON formatado.', 'ok');
+        setStatus('JSON formatted.', 'ok');
       } catch (e) {
         setStatus(e.message, 'error');
       }

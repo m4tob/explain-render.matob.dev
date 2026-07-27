@@ -1,8 +1,8 @@
 /*
- * graphics.js - camada grafica (medicao de texto, contexto tipo cairo que emite SVG
- * e as figuras basicas: caixas, diamantes, textos).
+ * graphics.js - graphics layer: text measurement, a cairo-like context that emits
+ * SVG, and the basic figures (boxes, diamonds, text).
  *
- * Porte client-side do renderer do MySQL Workbench (Visual Explain).
+ * Client-side port of the MySQL Workbench renderer (Visual Explain).
  * Original: Copyright (c) 2012, 2021, Oracle and/or its affiliates - GPL v2.
  */
 (function (global) {
@@ -12,7 +12,7 @@
   var FONT_STACK = 'Helvetica, Arial, "Liberation Sans", "Nimbus Sans", sans-serif';
 
   /* ------------------------------------------------------------------ *
-   * Medicao de texto (equivalente a cairo_text_extents)
+   * Text measurement (the equivalent of cairo_text_extents)
    * ------------------------------------------------------------------ */
 
   var measureCanvas = document.createElement('canvas');
@@ -28,8 +28,8 @@
   }
 
   /**
-   * Devolve extents no mesmo formato do cairo:
-   * x_bearing, y_bearing, width, height (tinta), x_advance, y_advance.
+   * Returns extents in the same shape cairo used:
+   * x_bearing, y_bearing, width, height (ink), x_advance, y_advance.
    */
   function textExtents(text, size, bold) {
     var key = size + '|' + (bold ? 1 : 0) + '|' + text;
@@ -56,8 +56,8 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Contexto de desenho: mesma API usada pelo renderer original (cairo),
-   * porem emitindo elementos SVG.
+   * Drawing context: the same API the original renderer used (cairo), except
+   * that it emits SVG elements instead of rasterizing.
    * ------------------------------------------------------------------ */
 
   function fmt(v) {
@@ -209,7 +209,7 @@
 
   SvgContext.prototype.show_text = function (text) {
     if (text === null || text === undefined || text === '') return;
-    // o desenho usa sempre move_to imediatamente antes de show_text
+    // the drawing always calls move_to right before show_text
     var last = this.path[this.path.length - 1];
     if (!last || last[0] !== 'M') return;
     var coords = last.substring(1).split(' ');
@@ -228,7 +228,7 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * Setas
+   * Arrows
    * ------------------------------------------------------------------ */
 
   function draw_varrow(cr, tip, ah, aw) {
@@ -254,7 +254,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Figuras
+   * Figures
    * ------------------------------------------------------------------ */
 
   var HFill = 1 << 0;

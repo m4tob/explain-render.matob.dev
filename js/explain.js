@@ -1,8 +1,8 @@
 /*
- * explain.js - transforma o JSON do EXPLAIN em arvore de nos, calcula o layout
- * e desenha o resultado dentro de um grupo SVG.
+ * explain.js - turns the EXPLAIN JSON into a tree of nodes, lays it out and
+ * draws the result inside an SVG group.
  *
- * Porte client-side do renderer do MySQL Workbench (Visual Explain).
+ * Client-side port of the MySQL Workbench renderer (Visual Explain).
  * Original: Copyright (c) 2012, 2021, Oracle and/or its affiliates - GPL v2.
  */
 (function (global) {
@@ -22,7 +22,7 @@
     this._json = json;
     this.warnings = [];
 
-    // constantes de layout (iguais as do Workbench)
+    // layout constants (the same ones the Workbench uses)
     this.default_height = 65;
     this.vspacing = 50;
     this.hspacing = 50;
@@ -31,7 +31,7 @@
     this.frame_padding = 10;
     this.global_padding = 20;
 
-    // margem da imagem final, depois de recortar o espaco em branco
+    // margin of the final image, after cropping the empty space away
     this.pad_x = 15;
     this.pad_y = 10;
     this.offset = [0, 0];
@@ -64,7 +64,7 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * Parser do JSON
+   * JSON parser
    * ------------------------------------------------------------------ */
 
   ExplainContext.prototype.handle_table = function (table) {
@@ -105,8 +105,8 @@
       rows_produced: table.rows_produced_per_join
     };
 
-    // tabelas com materialized_from_subquery nao sao tabelas de verdade:
-    // viram um container com a subquery que as gera
+    // tables with materialized_from_subquery are not real tables: they become
+    // a container holding the subquery that produces them
     if (materialized_from_subquery_node) {
       opts.materialized_from = materialized_from_subquery_node;
       opts.materialize_attributes = materialized_attributes;
@@ -136,7 +136,7 @@
       }
     }
     if (parts.length !== 1) {
-      throw new Error('nested_loop com estrutura inesperada');
+      throw new Error('unexpected nested_loop structure');
     }
     return parts[0];
   };
@@ -242,7 +242,7 @@
       if (key === 'nested_loop') {
         content = this.handle_nested_loop(value);
       } else if (key === 'table') {
-        // no 5.6 um query_block podia ter uma tabela so com message: "No tables used"
+        // in 5.6 a query_block could hold a table carrying only message: "No tables used"
         if ('message' in value && keyCount(value) === 1) {
           data.message = value.message;
         } else {
@@ -259,9 +259,9 @@
       } else if (key === 'cost_info') {
         cost_info = value;
       } else if (key === 'select_id' || key === 'message') {
-        /* usados diretamente pelo no */
+        /* used directly by the node */
       } else if (key === 'union_result') {
-        // o query_block pai e redundante aqui, ele tem um unico filho
+        // the parent query_block is redundant here, it has a single child
         content = this.handle_union_result(key, value);
       } else if (key === 'select_list_subqueries') {
         select_list_subqueries = this.handle_attached_subqueries(key, value);
@@ -298,21 +298,21 @@
   };
 
   /* ------------------------------------------------------------------ *
-   * Layout e desenho
+   * Layout and drawing
    * ------------------------------------------------------------------ */
 
   ExplainContext.prototype.layout = function () {
     if (!this._root) return null;
 
-    // o root recebe fundo cinza, como no Workbench
+    // the root gets a gray background, as in the Workbench
     this._root._figure.set_fill_color(0.8, 0.8, 0.8, 1);
 
     var measureGroup = document.createElementNS(g.SVGNS, 'g');
     var cr = new g.SvgContext(measureGroup);
 
-    // duas passadas, como no original (uma em layout(), outra no repaint):
-    // figuras com HFill - a barra do UNION, o quadro de attached_subqueries -
-    // se esticam ate a largura total que a passada anterior calculou.
+    // two passes, as in the original (one in layout(), one in repaint): figures
+    // with HFill - the UNION bar, the attached_subqueries frame - stretch to the
+    // total width computed by the previous pass.
     this._root.do_relayout(cr);
     this._root.do_relayout(cr);
     this._root.move(this.global_padding, this.global_padding);
@@ -324,9 +324,9 @@
   };
 
   /**
-   * Bounding box do que foi realmente desenhado, somando a espessura dos tracos.
-   * O layout reserva mais espaco do que o desenho ocupa, entao e isso que define
-   * o tamanho final da imagem.
+   * Bounding box of what was actually painted, including stroke width. The
+   * layout reserves more room than the drawing uses, so this is what defines
+   * the final image size.
    */
   function inkBounds(root) {
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -357,7 +357,7 @@
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
 
-  /** Mede mesmo que o grupo ainda nao esteja no documento (getBBox exige render). */
+  /** Measures even if the group is not in the document yet (getBBox needs render). */
   function measureInk(el) {
     if (el.isConnected) return inkBounds(el);
 
@@ -377,9 +377,9 @@
   }
 
   /**
-   * Desenha o diagrama dentro do grupo SVG informado, recortado no conteudo:
-   * a arvore vai num subgrupo deslocado, o fundo branco cobre exatamente a
-   * area final e `this.size` passa a valer o tamanho da imagem recortada.
+   * Draws the diagram inside the given SVG group, cropped to the content: the
+   * tree goes into an offset subgroup, the white background covers exactly the
+   * final area, and `this.size` becomes the size of the cropped image.
    */
   ExplainContext.prototype.render = function (group) {
     if (!this._root) return;
@@ -408,7 +408,7 @@
     group.insertBefore(bg, inner);
   };
 
-  /** Lista de nos em pre-ordem, usada para tooltips e destaque. */
+  /** Nodes in pre-order, used for tooltips and highlighting. */
   ExplainContext.prototype.collectNodes = function () {
     var out = [];
     (function walk(node, depth) {
@@ -420,7 +420,7 @@
     return out;
   };
 
-  /** Retangulo (absoluto) da figura interna do no, para hit testing. */
+  /** Absolute rectangle of the node's inner figure, for hit testing. */
   function nodeRect(node) {
     return {
       x: node._figure.root_x,

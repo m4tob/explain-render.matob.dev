@@ -1,11 +1,11 @@
 /*
- * Gera as imagens de compartilhamento e o icone de toque a partir do proprio
- * renderer: o diagrama do cartao e o mesmo SVG que a aplicacao exporta.
- * Nao precisa de dependencias: node >= 22 e o Google Chrome instalado.
+ * Builds the share image and the touch icon from the renderer itself: the diagram
+ * on the card is the same SVG the app exports.
+ * No dependencies: node >= 22 and Google Chrome installed.
  *
  *   node tools/og-image.mjs
  *
- * Escreve og-image.png (1200x630) e apple-touch-icon.png (180x180) na raiz.
+ * Writes og-image.png (1200x630) and apple-touch-icon.png (180x180) at the root.
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -18,8 +18,8 @@ const APP = pathToFileURL(join(ROOT, 'index.html')).href;
 const WORK = mkdtempSync(join(tmpdir(), 'explain-render-og-'));
 const PORT = 9334;
 
-// exemplo que aparece no cartao: mostra tabela, nested loop e ORDER num
-// desenho que ainda cabe legivel em 1200x630
+// the sample shown on the card: a table, a nested loop and an ORDER, in a drawing
+// that still reads well at 1200x630
 const SAMPLE = 'JOIN + ORDER BY';
 
 const chrome = spawn('google-chrome', [
@@ -38,10 +38,10 @@ async function debuggerUrl() {
       const tabs = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
       const page = tabs.find((t) => t.type === 'page');
       if (page) return page.webSocketDebuggerUrl;
-    } catch { /* chrome ainda subindo */ }
+    } catch { /* chrome still starting */ }
     await sleep(200);
   }
-  throw new Error('Chrome nao respondeu na porta de debug');
+  throw new Error('Chrome did not answer on the debug port');
 }
 
 const ws = new WebSocket(await debuggerUrl());
@@ -93,7 +93,7 @@ async function shot(html, width, height, scale, out) {
 await send('Runtime.enable');
 await send('Page.enable');
 
-// 1. renderiza o exemplo na propria aplicacao e pega o SVG exportado
+// 1. render the sample in the app itself and take the exported SVG
 await send('Page.navigate', { url: APP });
 await sleep(2500);
 
@@ -107,7 +107,7 @@ const clicked = await evaluate(`(function () {
   }
   return false;
 })()`);
-if (!clicked) throw new Error(`exemplo "${SAMPLE}" nao encontrado`);
+if (!clicked) throw new Error(`sample "${SAMPLE}" not found`);
 await sleep(600);
 
 const diagram = JSON.parse(await evaluate(`(function () {
@@ -124,7 +124,7 @@ const diagram = JSON.parse(await evaluate(`(function () {
     w: w, h: h, svg: new XMLSerializer().serializeToString(svg)
   });
 })()`));
-console.log(`diagrama: ${SAMPLE}  ${diagram.w}x${diagram.h}`);
+console.log(`diagram: ${SAMPLE}  ${diagram.w}x${diagram.h}`);
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, ' +
   '"Helvetica Neue", Arial, sans-serif';
@@ -137,9 +137,9 @@ const LOGO = `<svg viewBox="0 0 32 32">
   <path d="M16 12v4M9 16h14M9 16v4M23 16v4" stroke="#fff" stroke-width="1.8" fill="none"/>
 </svg>`;
 
-// 2. cartao 1200x630 para Open Graph / Twitter
+// 2. the 1200x630 card for Open Graph / Twitter
 const card = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><style>
+<html lang="en"><head><meta charset="UTF-8"><style>
   * { box-sizing: border-box; }
   body {
     margin: 0; width: 1200px; height: 630px; display: flex;
@@ -158,7 +158,7 @@ const card = `<!DOCTYPE html>
     color: #46525f; max-width: 490px;
   }
   .tagline b { color: #1b2430; font-weight: 600; }
-  /* max-width segura a quebra em 2 + 2, que fica mais equilibrado que 3 + 1 */
+  /* max-width forces a 2 + 2 wrap, better balanced than 3 + 1 */
   .badges { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 34px; max-width: 365px; }
   .badge {
     font-size: 19px; font-weight: 600; padding: 8px 16px; border-radius: 999px;
@@ -179,13 +179,13 @@ const card = `<!DOCTYPE html>
 </style></head><body>
   <div class="left">
     <div class="brand">${LOGO}<h1>EXPLAIN Render</h1></div>
-    <p class="tagline">O plano de execu&ccedil;&atilde;o da sua query, em JSON,
-      vira <b>diagrama</b> - e sai em <b>SVG</b>.</p>
+    <p class="tagline">Your query plan, in JSON, becomes a <b>diagram</b>
+      - and exports to <b>SVG</b>.</p>
     <div class="badges">
       <span class="badge accent">MySQL</span>
       <span class="badge accent">PostgreSQL</span>
       <span class="badge">SVG + PNG</span>
-      <span class="badge">100% no navegador</span>
+      <span class="badge">In your browser</span>
     </div>
     <div class="url">explain-render.matob.dev</div>
   </div>
@@ -194,7 +194,7 @@ const card = `<!DOCTYPE html>
 
 await shot(card, 1200, 630, 1, 'og-image.png');
 
-// 3. icone de toque: o mesmo logo, sem canto arredondado (iOS aplica a mascara)
+// 3. touch icon: the same logo, without rounded corners (iOS applies its own mask)
 const icon = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
   body { margin: 0; width: 180px; height: 180px; background: #2f6fb0; }

@@ -1,6 +1,6 @@
 /*
- * samples.js - exemplos de saida de EXPLAIN em JSON (MySQL 8.0 e PostgreSQL 16)
- * usados para demonstrar o visualizador.
+ * samples.js - example EXPLAIN output in JSON (MySQL 8.0 and PostgreSQL 16),
+ * used to demo the viewer.
  */
 (function (global) {
   'use strict';
@@ -275,7 +275,7 @@
     },
     {
       id: 'index-lookup',
-      name: 'Lookup por chave unica',
+      name: 'Unique key lookup',
       sql: 'EXPLAIN FORMAT=JSON\nSELECT c.Name, co.Name\n  FROM city c\n' +
         '  JOIN country co ON co.Code = c.CountryCode\n WHERE c.ID = 1890;',
       json: {
@@ -510,9 +510,9 @@
     },
     {
       id: 'pg-append',
-      name: 'Append (particoes)',
-      sql: 'EXPLAIN (FORMAT JSON)\nSELECT * FROM medicoes\n' +
-        ' WHERE coletado_em >= \'2026-01-01\' AND valor > 90;',
+      name: 'Append (partitions)',
+      sql: 'EXPLAIN (FORMAT JSON)\nSELECT * FROM readings\n' +
+        ' WHERE collected_at >= \'2026-01-01\' AND value > 90;',
       json: [
         {
           Plan: {
@@ -525,36 +525,36 @@
               {
                 'Node Type': 'Seq Scan',
                 'Parent Relationship': 'Member',
-                'Relation Name': 'medicoes_2026_01',
-                Alias: 'medicoes_1',
+                'Relation Name': 'readings_2026_01',
+                Alias: 'readings_1',
                 'Startup Cost': 0.00,
                 'Total Cost': 189.00,
                 'Plan Rows': 612,
                 'Plan Width': 24,
-                Filter: '(valor > 90)'
+                Filter: '(value > 90)'
               },
               {
                 'Node Type': 'Seq Scan',
                 'Parent Relationship': 'Member',
-                'Relation Name': 'medicoes_2026_02',
-                Alias: 'medicoes_2',
+                'Relation Name': 'readings_2026_02',
+                Alias: 'readings_2',
                 'Startup Cost': 0.00,
                 'Total Cost': 178.00,
                 'Plan Rows': 402,
                 'Plan Width': 24,
-                Filter: '(valor > 90)'
+                Filter: '(value > 90)'
               },
               {
                 'Node Type': 'Index Scan',
                 'Parent Relationship': 'Member',
-                'Relation Name': 'medicoes_2026_03',
-                Alias: 'medicoes_3',
-                'Index Name': 'medicoes_2026_03_valor_idx',
+                'Relation Name': 'readings_2026_03',
+                Alias: 'readings_3',
+                'Index Name': 'readings_2026_03_value_idx',
                 'Startup Cost': 0.29,
                 'Total Cost': 61.66,
                 'Plan Rows': 90,
                 'Plan Width': 24,
-                'Index Cond': '(valor > 90)'
+                'Index Cond': '(value > 90)'
               }
             ]
           }
@@ -563,10 +563,10 @@
     },
     {
       id: 'pg-nested-loop',
-      name: 'Nested Loop com estimativa errada',
-      sql: 'EXPLAIN (FORMAT JSON, ANALYZE)\nSELECT p.nome, i.quantidade\n' +
-        '  FROM pedidos p\n  JOIN itens i ON i.pedido_id = p.id\n' +
-        ' WHERE p.status = \'aberto\';',
+      name: 'Nested Loop with a bad estimate',
+      sql: 'EXPLAIN (FORMAT JSON, ANALYZE)\nSELECT o.name, i.quantity\n' +
+        '  FROM orders o\n  JOIN items i ON i.order_id = o.id\n' +
+        ' WHERE o.status = \'open\';',
       json: [
         {
           Plan: {
@@ -584,8 +584,8 @@
               {
                 'Node Type': 'Seq Scan',
                 'Parent Relationship': 'Outer',
-                'Relation Name': 'pedidos',
-                Alias: 'p',
+                'Relation Name': 'orders',
+                Alias: 'o',
                 'Startup Cost': 0.00,
                 'Total Cost': 388.00,
                 'Plan Rows': 24,
@@ -594,15 +594,15 @@
                 'Actual Total Time': 6.114,
                 'Actual Rows': 4106,
                 'Actual Loops': 1,
-                Filter: "(status = 'aberto'::text)",
+                Filter: "(status = 'open'::text)",
                 'Rows Removed by Filter': 15894
               },
               {
                 'Node Type': 'Index Scan',
                 'Parent Relationship': 'Inner',
-                'Relation Name': 'itens',
+                'Relation Name': 'items',
                 Alias: 'i',
-                'Index Name': 'itens_pedido_id_idx',
+                'Index Name': 'items_order_id_idx',
                 'Startup Cost': 0.29,
                 'Total Cost': 17.60,
                 'Plan Rows': 4,
@@ -611,7 +611,7 @@
                 'Actual Total Time': 0.044,
                 'Actual Rows': 4,
                 'Actual Loops': 4106,
-                'Index Cond': '(pedido_id = p.id)'
+                'Index Cond': '(order_id = o.id)'
               }
             ]
           },

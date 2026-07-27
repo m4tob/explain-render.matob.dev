@@ -1,10 +1,10 @@
 /*
- * Teste end-to-end da aplicacao usando Chrome headless via DevTools Protocol.
- * Nao precisa de dependencias: node >= 22 e o Google Chrome instalado.
+ * End-to-end test of the app, driving headless Chrome over the DevTools Protocol.
+ * No dependencies: node >= 22 and Google Chrome installed.
  *
  *   node tools/e2e.mjs
  *
- * Sai com codigo 1 se algum teste falhar.
+ * Exits with code 1 if any check fails.
  */
 import { spawn } from 'node:child_process';
 import {
@@ -38,10 +38,10 @@ async function debuggerUrl() {
       const tabs = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
       const page = tabs.find((t) => t.type === 'page');
       if (page) return page.webSocketDebuggerUrl;
-    } catch { /* chrome ainda subindo */ }
+    } catch { /* chrome still starting */ }
     await sleep(200);
   }
-  throw new Error('Chrome nao respondeu na porta de debug');
+  throw new Error('Chrome did not answer on the debug port');
 }
 
 const ws = new WebSocket(await debuggerUrl());
@@ -88,25 +88,25 @@ await send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DOW
 await send('Page.navigate', { url: APP });
 await sleep(2500);
 
-// nenhum erro de console
+// no console errors
 const consoleErrors = events.filter((e) =>
   e.method === 'Runtime.exceptionThrown' ||
   (e.method === 'Log.entryAdded' && e.params.entry.level === 'error'));
-check('sem erros de console', consoleErrors.length === 0,
+check('no console errors', consoleErrors.length === 0,
   consoleErrors.map((e) => JSON.stringify(e.params).slice(0, 200)).join(' | '));
 
-// diagrama inicial
+// initial diagram
 const initial = JSON.parse(await evaluate(`JSON.stringify({
   content: document.querySelectorAll('#content path, #content text').length,
   hits: document.querySelectorAll('#hits > *').length,
   status: document.getElementById('status').textContent,
   empty: document.getElementById('empty-state').hidden
 })`));
-check('diagrama inicial desenhado', initial.content > 20, 'elementos=' + initial.content);
-check('areas de hover criadas', initial.hits >= 2, 'hits=' + initial.hits);
-check('estado vazio escondido', initial.empty === true);
+check('initial diagram drawn', initial.content > 20, 'elements=' + initial.content);
+check('hover areas created', initial.hits >= 2, 'hits=' + initial.hits);
+check('empty state hidden', initial.empty === true);
 
-// todos os exemplos
+// every sample
 const dialects = new Set();
 const total = await evaluate(`document.querySelectorAll('#samples .chip').length`);
 for (let i = 0; i < total; i++) {
@@ -117,11 +117,11 @@ for (let i = 0; i < total; i++) {
     cls: document.getElementById('status').className,
     txt: document.getElementById('status').textContent
   })`));
-  check(`exemplo ${i} renderiza`, info.n > 10 && !/error/.test(info.cls), info.txt);
+  check(`sample ${i} renders`, info.n > 10 && !/error/.test(info.cls), info.txt);
   dialects.add(info.txt.split(' -')[0]);
 }
 
-// recorte: 15px nas laterais, 10px em cima e embaixo
+// crop: 15px on the sides, 10px top and bottom
 const pad = JSON.parse(await evaluate(`(function () {
   var inner = document.querySelector('#content > g');
   var bg = document.querySelector('#content > rect');
@@ -140,18 +140,18 @@ const pad = JSON.parse(await evaluate(`(function () {
   var t = /translate\\(([-\\d.]+),([-\\d.]+)\\)/.exec(inner.getAttribute('transform'));
   var dx = +t[1], dy = +t[2];
   return JSON.stringify({
-    esq: +(min[0] + dx).toFixed(1),
-    topo: +(min[1] + dy).toFixed(1),
-    dir: +(+bg.getAttribute('width') - (max[0] + dx)).toFixed(1),
-    base: +(+bg.getAttribute('height') - (max[1] + dy)).toFixed(1)
+    left: +(min[0] + dx).toFixed(1),
+    top: +(min[1] + dy).toFixed(1),
+    right: +(+bg.getAttribute('width') - (max[0] + dx)).toFixed(1),
+    bottom: +(+bg.getAttribute('height') - (max[1] + dy)).toFixed(1)
   });
 })()`));
-const near = (v, alvo) => Math.abs(v - alvo) <= 1.01;
-check('margens do recorte (15 x 10)',
-  near(pad.esq, 15) && near(pad.dir, 15) && near(pad.topo, 10) && near(pad.base, 10),
+const near = (v, target) => Math.abs(v - target) <= 1.01;
+check('crop margins (15 x 10)',
+  near(pad.left, 15) && near(pad.right, 15) && near(pad.top, 10) && near(pad.bottom, 10),
   JSON.stringify(pad));
 
-check('exemplos cobrem os dois dialetos',
+check('samples cover both dialects',
   dialects.has('MySQL') && dialects.has('PostgreSQL'), [...dialects].join(', '));
 
 // tooltip
@@ -166,34 +166,34 @@ const tip = JSON.parse(await evaluate(`JSON.stringify({
   hidden: document.getElementById('tooltip').hidden,
   heads: document.querySelectorAll('#tooltip .t-head').length
 })`));
-check('tooltip aparece no hover', tip.hidden === false && tip.heads > 0, JSON.stringify(tip));
+check('tooltip shows on hover', tip.hidden === false && tip.heads > 0, JSON.stringify(tip));
 
 // zoom
 const zoomBefore = await evaluate(`document.getElementById('zoom-label').textContent`);
 await evaluate(`document.getElementById('btn-zoom-in').click()`);
 const zoomAfter = await evaluate(`document.getElementById('zoom-label').textContent`);
-check('zoom altera a escala', zoomBefore !== zoomAfter, `${zoomBefore} -> ${zoomAfter}`);
+check('zoom changes the scale', zoomBefore !== zoomAfter, `${zoomBefore} -> ${zoomAfter}`);
 await evaluate(`document.getElementById('btn-fit').click()`);
 
-// entradas invalidas
+// invalid input
 await evaluate(`(function () {
-  document.getElementById('json-input').value = '{ isso nao e json';
+  document.getElementById('json-input').value = '{ this is not json';
   document.getElementById('btn-render').click();
 })()`);
 await sleep(250);
-check('JSON invalido reportado',
+check('invalid JSON reported',
   /error/.test(await evaluate(`document.getElementById('status').className`)),
   await evaluate(`document.getElementById('status').textContent`));
 
 await evaluate(`(function () {
-  document.getElementById('json-input').value = '{"algo": 1}';
+  document.getElementById('json-input').value = '{"something": 1}';
   document.getElementById('btn-render').click();
 })()`);
 await sleep(250);
 const noQueryBlock = await evaluate(`document.getElementById('status').textContent`);
-check('JSON sem query_block reportado', /query_block/.test(noQueryBlock), noQueryBlock);
+check('JSON without query_block reported', /query_block/.test(noQueryBlock), noQueryBlock);
 
-// saida colada direto do cliente mysql (com \G, cabecalho e rodape)
+// output pasted straight from the mysql client (with \G, header and footer)
 const dirty = `*************************** 1. row ***************************
 EXPLAIN: {
   "query_block": {
@@ -218,9 +218,9 @@ const pasted = JSON.parse(await evaluate(`JSON.stringify({
   txt: document.getElementById('status').textContent,
   n: document.querySelectorAll('#content path, #content text').length
 })`));
-check('saida bruta do cliente mysql', !/error/.test(pasted.cls) && pasted.n > 5, pasted.txt);
+check('raw output from the mysql client', !/error/.test(pasted.cls) && pasted.n > 5, pasted.txt);
 
-// saida bruta do psql no formato alinhado (com o "+" de continuacao de linha)
+// raw psql output in aligned format (with the "+" line-continuation marker)
 const psql = `                        QUERY PLAN
 ------------------------------------------------------------
  [                                                          +
@@ -246,13 +246,13 @@ const pgPasted = JSON.parse(await evaluate(`JSON.stringify({
   cls: document.getElementById('status').className,
   txt: document.getElementById('status').textContent,
   n: document.querySelectorAll('#content path, #content text').length,
-  legenda: document.getElementById('legend-title').textContent
+  legend: document.getElementById('legend-title').textContent
 })`));
-check('saida bruta do psql', !/error/.test(pgPasted.cls) && /PostgreSQL/.test(pgPasted.txt) &&
+check('raw output from psql', !/error/.test(pgPasted.cls) && /PostgreSQL/.test(pgPasted.txt) &&
   pgPasted.n > 5, pgPasted.txt);
-check('legenda acompanha o dialeto', /tipos de no/.test(pgPasted.legenda), pgPasted.legenda);
+check('legend follows the dialect', /node types/.test(pgPasted.legend), pgPasted.legend);
 
-// exportacoes
+// exports
 await evaluate(`document.querySelectorAll('#samples .chip')[2].click()`);
 await sleep(400);
 await evaluate(`document.getElementById('btn-svg').click()`);
@@ -262,12 +262,12 @@ await sleep(1800);
 const files = readdirSync(DOWNLOADS).filter((f) => !f.endsWith('.crdownload'));
 const svgFile = files.find((f) => f.endsWith('.svg'));
 const pngFile = files.find((f) => f.endsWith('.png'));
-check('download do SVG', !!svgFile && statSync(join(DOWNLOADS, svgFile)).size > 1000,
+check('SVG download', !!svgFile && statSync(join(DOWNLOADS, svgFile)).size > 1000,
   svgFile || files.join(','));
-check('download do PNG', !!pngFile && statSync(join(DOWNLOADS, pngFile)).size > 5000,
+check('PNG download', !!pngFile && statSync(join(DOWNLOADS, pngFile)).size > 5000,
   pngFile || files.join(','));
 
-// tags de SEO e de compartilhamento
+// SEO and sharing tags
 const SITE = 'https://explain-render.matob.dev/';
 const meta = JSON.parse(await evaluate(`(function () {
   function attr(sel, name) {
@@ -294,69 +294,69 @@ const meta = JSON.parse(await evaluate(`(function () {
   });
 })()`));
 
-check('title e description presentes',
+check('title and description present',
   meta.title.length > 20 && meta.title.length < 75 &&
   meta.desc.length > 80 && meta.desc.length < 175,
   `title ${meta.title.length} ch, description ${meta.desc.length} ch`);
 
-// as entidades HTML tem que chegar decodificadas em quem le a pagina
-check('acentos decodificados nas metatags',
-  /execu\u00e7\u00e3o/.test(meta.desc) && /n\u00famero/.test(meta.ogDesc) &&
-  !/&[a-z]+;/.test(meta.desc + meta.ogDesc + meta.title),
+// the copy is plain English: no HTML entities and nothing outside ASCII left over
+check('metatag copy is clean',
+  !/&[a-z]+;/.test(meta.desc + meta.ogDesc + meta.title) &&
+  !/[^\x00-\x7F]/.test(meta.desc + meta.ogDesc + meta.title),
   meta.desc.slice(0, 60) + '...');
 
-check('canonical e og:url apontam para o site',
+check('canonical and og:url point at the site',
   meta.canonical === SITE && meta.ogUrl === SITE, meta.canonical);
 
-check('indexacao liberada',
+check('indexing allowed',
   /index/.test(meta.robots) && !/noindex/.test(meta.robots) &&
   /max-image-preview:large/.test(meta.robots), meta.robots);
 
-check('Open Graph completo',
-  meta.ogType === 'website' && meta.ogLocale === 'pt_BR' &&
+check('Open Graph complete',
+  meta.ogType === 'website' && meta.ogLocale === 'en_US' &&
   !!meta.ogTitle && !!meta.ogDesc && meta.ogImage === SITE + 'og-image.png',
   `${meta.ogType}, ${meta.ogLocale}, ${meta.ogImage}`);
 
-check('Twitter card com imagem grande',
+check('Twitter card with a large image',
   meta.twCard === 'summary_large_image' && meta.twImage === meta.ogImage, meta.twCard);
 
-check('idioma declarado', meta.lang === 'pt-BR', meta.lang);
+check('language declared', meta.lang === 'en', meta.lang);
 
 let ld = null;
-try { ld = JSON.parse(meta.ld); } catch { /* invalido */ }
-check('JSON-LD valido',
+try { ld = JSON.parse(meta.ld); } catch { /* invalid */ }
+check('JSON-LD valid',
   !!ld && ld['@type'] === 'WebApplication' && ld.url === SITE &&
   Array.isArray(ld.featureList) && ld.featureList.length > 0,
-  ld ? `${ld['@type']}, ${ld.featureList.length} itens em featureList` : 'nao e JSON valido');
+  ld ? `${ld['@type']}, ${ld.featureList.length} items in featureList` : 'not valid JSON');
 
-// arquivos que as metatags e os robos referenciam
+// files the metatags and the robots point at
 function pngSize(file) {
   const b = readFileSync(join(ROOT, file));
   return [b.readUInt32BE(16), b.readUInt32BE(20)];
 }
 const og = existsSync(join(ROOT, 'og-image.png')) ? pngSize('og-image.png') : [0, 0];
 const ogBytes = og[0] ? statSync(join(ROOT, 'og-image.png')).size : 0;
-check('og-image.png com 1200x630 e leve o bastante',
+check('og-image.png is 1200x630 and light enough',
   og[0] === 1200 && og[1] === 630 && ogBytes < 300 * 1024,
   `${og[0]}x${og[1]}, ${(ogBytes / 1024).toFixed(0)} KB`);
 
 const touch = existsSync(join(ROOT, 'apple-touch-icon.png')) ? pngSize('apple-touch-icon.png') : [0, 0];
-check('apple-touch-icon.png com 180x180',
+check('apple-touch-icon.png is 180x180',
   touch[0] === 180 && touch[1] === 180 && meta.touchIcon === 'apple-touch-icon.png',
   `${touch[0]}x${touch[1]}`);
 
 const robots = existsSync(join(ROOT, 'robots.txt')) ? readFileSync(join(ROOT, 'robots.txt'), 'utf8') : '';
-check('robots.txt libera o site e aponta o sitemap',
+check('robots.txt allows the site and points at the sitemap',
   /^User-agent:\s*\*/m.test(robots) && !/^Disallow:\s*\/\s*$/m.test(robots) &&
   robots.includes(SITE + 'sitemap.xml'), robots.trim().split('\n').join(' | '));
 
 const sitemap = existsSync(join(ROOT, 'sitemap.xml')) ? readFileSync(join(ROOT, 'sitemap.xml'), 'utf8') : '';
-check('sitemap.xml lista a URL canonica',
+check('sitemap.xml lists the canonical URL',
   sitemap.includes(`<loc>${SITE}</loc>`) && /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.test(sitemap),
   (/<lastmod>(.*?)<\/lastmod>/.exec(sitemap) || [, '?'])[1]);
 
-// a pagina de erro precisa existir na raiz: e a ausencia dela que faz o Cloudflare
-// Pages responder 200 com a home para qualquer caminho (modo SPA)
+// the error page has to exist at the root: its absence is what makes Cloudflare
+// Pages answer 200 with the home page for every path (single-page-app mode)
 await send('Page.navigate', { url: pathToFileURL(join(ROOT, '404.html')).href });
 await sleep(800);
 const page404 = JSON.parse(await evaluate(`(function () {
@@ -368,20 +368,20 @@ const page404 = JSON.parse(await evaluate(`(function () {
     title: document.title,
     robots: attr('meta[name="robots"]', 'content'),
     home: attr('a.btn', 'href'),
-    texto: (document.querySelector('h1') || {}).textContent || '',
-    altura: document.querySelector('.card') ? document.querySelector('.card').offsetHeight : 0,
-    estiloExterno: document.querySelectorAll('link[rel="stylesheet"]').length
+    text: (document.querySelector('h1') || {}).textContent || '',
+    height: document.querySelector('.card') ? document.querySelector('.card').offsetHeight : 0,
+    externalStyles: document.querySelectorAll('link[rel="stylesheet"]').length
   });
 })()`));
-check('404.html fora do indice e com volta para a home',
+check('404.html is out of the index and links back home',
   /noindex/.test(page404.robots) && page404.home === '/' &&
-  page404.altura > 200 && page404.estiloExterno === 0 &&
-  /n\u00e3o existe/.test(page404.texto),
-  `${page404.robots}, ${page404.altura}px de altura`);
+  page404.height > 200 && page404.externalStyles === 0 &&
+  /does not exist/.test(page404.text),
+  `${page404.robots}, ${page404.height}px tall`);
 
 console.log(results.join('\n'));
 const failed = results.filter((r) => r.startsWith('FAIL')).length;
-console.log(`\n${results.length - failed}/${results.length} testes passaram`);
+console.log(`\n${results.length - failed}/${results.length} checks passed`);
 
 ws.close();
 chrome.kill();
