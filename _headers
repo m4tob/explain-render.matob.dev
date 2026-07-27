@@ -1,0 +1,18 @@
+# Cabecalhos aplicados pelo Cloudflare Pages a todas as respostas deste site.
+# Referrer-Policy e X-Content-Type-Options ja vem da Cloudflare, entao nao sao
+# repetidos aqui para nao mandar o cabecalho duas vezes.
+#
+# A aplicacao e toda local: nao carrega nada de terceiros. Por isso a CSP pode
+# ser fechada em 'self'. As excecoes existem e sao necessarias:
+#   'unsafe-inline' em script-src  -> o bloco JSON-LD e inline, e sem isso o
+#                                     Chrome o bloqueia e o Googlebot deixa de
+#                                     ler os dados estruturados
+#   'unsafe-inline' em style-src   -> a pagina 404 tem <style> inline
+#   data: e blob: em img-src       -> o favicon e um SVG em data:, e o export
+#                                     PNG desenha um data: URL no canvas e
+#                                     baixa o resultado como blob:
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=31536000
+  X-Frame-Options: DENY
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()

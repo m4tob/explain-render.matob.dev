@@ -67,6 +67,7 @@ og-image.png        imagem de compartilhamento (1200x630), gerada
 apple-touch-icon.png  icone de toque (180x180), gerado
 robots.txt          libera a indexacao e aponta o sitemap
 sitemap.xml         a unica URL do site
+_headers            CSP, HSTS e afins, lidos pelo Cloudflare Pages
 tools/e2e.mjs       teste end-to-end em Chrome headless
 tools/og-image.mjs  gerador das duas imagens acima
 ```
