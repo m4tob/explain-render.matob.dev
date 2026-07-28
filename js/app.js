@@ -32,7 +32,7 @@
     zoomOut: document.getElementById('btn-zoom-out'),
     fit: document.getElementById('btn-fit'),
     reset: document.getElementById('btn-reset'),
-    copy: document.getElementById('btn-copy'),
+    copyPng: document.getElementById('btn-copy-png'),
     png: document.getElementById('btn-png'),
     svgDl: document.getElementById('btn-svg'),
     theme: document.getElementById('btn-theme')
@@ -220,7 +220,7 @@
   }
 
   function setExportEnabled(enabled) {
-    [el.copy, el.png, el.svgDl, el.fit, el.reset, el.zoomIn, el.zoomOut].forEach(function (b) {
+    [el.copyPng, el.png, el.svgDl, el.fit, el.reset, el.zoomIn, el.zoomOut].forEach(function (b) {
       b.disabled = !enabled;
     });
   }
@@ -493,56 +493,70 @@
       'explain-' + timestamp() + '.svg');
   }
 
+  /** The diagram as a PNG blob, rendered at 2x over a white background. */
+  function pngBlob() {
+    return new Promise(function (resolve, reject) {
+      var text = buildStandaloneSvg();
+      if (!text) return reject(new Error('no diagram'));
+      var scale = 2;
+      var img = new Image();
+      img.onload = function () {
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(state.size[0] * scale);
+        canvas.height = Math.round(state.size[1] * scale);
+        var c = canvas.getContext('2d');
+        c.fillStyle = '#ffffff';
+        c.fillRect(0, 0, canvas.width, canvas.height);
+        c.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function (blob) {
+          blob ? resolve(blob) : reject(new Error('toBlob returned nothing'));
+        }, 'image/png');
+      };
+      img.onerror = function () { reject(new Error('the SVG did not load as an image')); };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+    });
+  }
+
   function exportPng() {
-    var text = buildStandaloneSvg();
-    if (!text) return;
-    var scale = 2;
-    var img = new Image();
-    img.onload = function () {
-      var canvas = document.createElement('canvas');
-      canvas.width = Math.round(state.size[0] * scale);
-      canvas.height = Math.round(state.size[1] * scale);
-      var c = canvas.getContext('2d');
-      c.fillStyle = '#ffffff';
-      c.fillRect(0, 0, canvas.width, canvas.height);
-      c.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(function (blob) {
-        if (blob) download(blob, 'explain-' + timestamp() + '.png');
-        else setStatus('Could not generate the PNG in this browser.', 'error');
-      }, 'image/png');
-    };
-    img.onerror = function () {
-      setStatus('Could not convert the SVG to PNG.', 'error');
-    };
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
+    pngBlob().then(function (blob) {
+      download(blob, 'explain-' + timestamp() + '.png');
+    }, function () {
+      setStatus('Could not generate the PNG in this browser.', 'error');
+    });
   }
 
-  function copySvg() {
-    var text = buildStandaloneSvg();
-    if (!text) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () {
-        toast('SVG copied to the clipboard');
-      }, function () { fallbackCopy(text); });
-    } else {
-      fallbackCopy(text);
+  /**
+   * Copies the diagram to the clipboard as an image, which is what a chat or a
+   * document expects on paste.
+   *
+   * The blob is handed to ClipboardItem as a promise on purpose: Safari drops the
+   * user gesture if the write happens after an await, and rejects the copy. Chrome
+   * and Firefox accept the promise form as well, but older builds only take a
+   * ready blob, hence the second attempt.
+   */
+  function copyPng() {
+    if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) {
+      setStatus('This browser cannot copy images to the clipboard. Use Download PNG.',
+        'error');
+      return;
     }
-  }
+    var pending = pngBlob();
+    var done = function () { toast('Image copied to the clipboard'); };
+    var failed = function () {
+      setStatus('Could not copy the image. Use Download PNG.', 'error');
+    };
 
-  function fallbackCopy(text) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
+    var write = function (value) {
+      return navigator.clipboard.write([new ClipboardItem({ 'image/png': value })]);
+    };
+
     try {
-      document.execCommand('copy');
-      toast('SVG copied to the clipboard');
+      write(pending).then(done, function () {
+        pending.then(function (blob) { write(blob).then(done, failed); }, failed);
+      });
     } catch (e) {
-      setStatus('Could not copy automatically.', 'error');
+      pending.then(function (blob) { write(blob).then(done, failed); }, failed);
     }
-    ta.remove();
   }
 
   /* ------------------------------------------------------------------ *
@@ -722,7 +736,7 @@
       else hideTooltip();
     });
 
-    el.copy.addEventListener('click', copySvg);
+    el.copyPng.addEventListener('click', copyPng);
     el.png.addEventListener('click', exportPng);
     el.svgDl.addEventListener('click', exportSvg);
 

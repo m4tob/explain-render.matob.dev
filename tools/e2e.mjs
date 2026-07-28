@@ -259,6 +259,29 @@ await evaluate(`document.getElementById('btn-svg').click()`);
 await sleep(700);
 await evaluate(`document.getElementById('btn-png').click()`);
 await sleep(1800);
+// copy to clipboard: the real navigator.clipboard.write needs a permission the
+// headless run does not have, so it is stubbed to capture what the app hands over
+const copied = JSON.parse(await evaluate(`(async function () {
+  var got = null;
+  navigator.clipboard.write = function (items) {
+    got = items[0];
+    return Promise.resolve();
+  };
+  document.getElementById('btn-copy-png').click();
+  await new Promise(function (r) { setTimeout(r, 1500); });
+  if (!got) return JSON.stringify({ called: false });
+  var blob = await got.getType('image/png');
+  return JSON.stringify({
+    called: true, types: got.types.join(','), type: blob.type, size: blob.size,
+    toast: !!document.querySelector('.toast'),
+    status: document.getElementById('status').className
+  });
+})()`));
+check('PNG copied to the clipboard',
+  copied.called && copied.types === 'image/png' && copied.type === 'image/png' &&
+  copied.size > 5000 && !/error/.test(copied.status || ''),
+  copied.called ? `${copied.type}, ${(copied.size / 1024).toFixed(0)} KB` : 'write() never called');
+
 const files = readdirSync(DOWNLOADS).filter((f) => !f.endsWith('.crdownload'));
 const svgFile = files.find((f) => f.endsWith('.svg'));
 const pngFile = files.find((f) => f.endsWith('.png'));

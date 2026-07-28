@@ -224,6 +224,8 @@ textarea#json-input:focus {
 }
 .btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn.icon { padding: 6px 10px; font-size: 15px; line-height: 1; min-width: 32px; }
+.btn.with-icon { display: inline-flex; align-items: center; gap: 7px; }
+.btn.with-icon svg { flex: none; }
 
 .status {
   margin: 10px 0 0;

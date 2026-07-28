@@ -157,9 +157,17 @@ The dialect is detected automatically.'></textarea>
         <button id="btn-reset" class="btn" type="button">100%</button>
       </div>
       <div class="tool-group">
-        <button id="btn-copy" class="btn" type="button">Copy SVG</button>
+        <button id="btn-copy-png" class="btn primary with-icon" type="button"
+                title="Copy the diagram as an image, ready to paste">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="12" height="12" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copy image
+        </button>
         <button id="btn-png" class="btn" type="button">Download PNG</button>
-        <button id="btn-svg" class="btn primary" type="button">Download SVG</button>
+        <button id="btn-svg" class="btn" type="button">Download SVG</button>
       </div>
     </div>
 

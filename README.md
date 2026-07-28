@@ -31,8 +31,9 @@ then extended to PostgreSQL.
   cause of a bad plan is hiding.
 - Node details (key used, conditions, costs, timings) on hover.
 - Zoom with the mouse wheel, drag to pan, fit to screen, double click to reframe.
-- Exports SVG, exports PNG at 2x and copies the SVG to the clipboard. The image is
-  cropped to the content, with a 15px margin on the sides and 10px top and bottom.
+- Copies the diagram to the clipboard as an image, ready to paste into a chat or a
+  document, and exports it as SVG or as PNG at 2x. The image is cropped to the content,
+  with a 15px margin on the sides and 10px top and bottom.
 - Ready made samples for both databases, light/dark theme, and the last JSON is kept
   between visits.
 
